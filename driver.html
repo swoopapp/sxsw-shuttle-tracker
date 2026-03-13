@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SXSW Shuttle - Driver Route</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a; color: #e0e0e0; min-height: 100vh;
+    padding: 0 0 100px;
+  }
+
+  .header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(15,15,15,0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 16px 20px;
+  }
+  .header h1 { font-size: 18px; font-weight: 700; color: #fff; }
+  .header-sub { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .route-badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px;
+  }
+  .route-badge.day { background: rgba(249,115,22,0.15); color: #f97316; }
+  .route-badge.night { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .stop-count { font-size: 12px; color: #666; }
+
+  .start-btn {
+    display: block; margin: 16px 20px; padding: 16px;
+    background: #22c55e; border: none; border-radius: 12px;
+    color: #fff; font-size: 16px; font-weight: 700;
+    cursor: pointer; text-align: center; text-decoration: none;
+    transition: background 0.15s;
+  }
+  .start-btn:hover { background: #16a34a; }
+  .start-btn:active { background: #15803d; }
+  .start-btn-sub { font-size: 11px; font-weight: 400; opacity: 0.8; margin-top: 4px; }
+
+  .stop-list { padding: 0 20px; }
+
+  .stop-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .stop-num {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+    background: rgba(99,102,241,0.3); border: 2px solid rgba(99,102,241,0.5);
+  }
+  .stop-num.night-only {
+    background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.5); color: #86efac;
+  }
+  .stop-num.first {
+    background: rgba(249,115,22,0.3); border-color: rgba(249,115,22,0.6); color: #fdba74;
+  }
+
+  .stop-info { flex: 1; min-width: 0; }
+  .stop-name { font-size: 15px; font-weight: 600; color: #ddd; }
+  .stop-venues { font-size: 11px; color: #666; margin-top: 2px; }
+  .stop-night-tag {
+    font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    background: rgba(34,197,94,0.15); color: #22c55e; margin-top: 4px; display: inline-block;
+  }
+
+  .nav-btn {
+    flex-shrink: 0; padding: 8px 14px;
+    background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 8px; color: #60a5fa; font-size: 12px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { background: rgba(59,130,246,0.25); color: #93c5fd; }
+
+  .loop-note {
+    margin: 16px 20px; padding: 12px 16px;
+    background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.2);
+    border-radius: 10px; font-size: 12px; color: #f97316;
+  }
+  .loop-note strong { color: #fdba74; }
+
+  .section-title {
+    font-size: 12px; font-weight: 700; color: #555; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 16px 20px 8px; margin-top: 8px;
+  }
+
+  .checklist-toggle {
+    display: flex; align-items: center; gap: 8px; margin: 12px 20px 0;
+    font-size: 13px; color: #888; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .checklist-toggle input { width: 18px; height: 18px; accent-color: #22c55e; }
+
+  .stop-item.checked .stop-name { text-decoration: line-through; color: #555; }
+  .stop-item.checked .stop-num { opacity: 0.3; }
+
+  .footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 20px; background: rgba(15,15,15,0.95);
+    backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 10px;
+  }
+  .footer a {
+    flex: 1; padding: 12px; border-radius: 10px; text-align: center;
+    text-decoration: none; font-size: 13px; font-weight: 600;
+  }
+  .footer .primary { background: #22c55e; color: #fff; }
+  .footer .secondary {
+    background: rgba(255,255,255,0.06); color: #aaa;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Driver Route Guide</h1>
+  <div class="header-sub">
+    <span class="route-badge" id="routeBadge"></span>
+    <span class="stop-count" id="stopCount"></span>
+  </div>
+</div>
+
+<div class="loop-note">
+  <strong>Loop Route:</strong> After the last stop, return to Stop #1 and repeat.
+  Google Maps will navigate you through every stop in order.
+</div>
+
+<label class="checklist-toggle">
+  <input type="checkbox" id="checklistMode"> Enable stop checklist (tap stops to mark done)
+</label>
+
+<div class="section-title">Route Stops (in order)</div>
+<div class="stop-list" id="stopList"></div>
+
+<div class="footer">
+  <a href="#" class="primary" id="startNavFooter">▶ Start Full Route</a>
+  <a href="/" class="secondary">Back to Tracker</a>
+</div>
+
+<script>
+const ALL_STOPS = {
+  'congress':    { name: '3rd & Congress',              lat: 30.26505, lng: -97.74374 },
+  'paramount':   { name: 'Paramount / F&TV Clubhouse',  lat: 30.26992, lng: -97.74190 },
+  'downright':   { name: 'Downright / Music Clubhouse', lat: 30.27114, lng: -97.73568 },
+  'shangrila':   { name: 'Shangri-La',                  lat: 30.26499, lng: -97.73198, nightOnly: true },
+  'hotelvegas':  { name: 'Hotel Vegas / Low Down',      lat: 30.26357, lng: -97.72785, nightOnly: true },
+  'violetcrown': { name: 'Violet Crown / ACL Live',     lat: 30.26576, lng: -97.74597 },
+  'palmer':      { name: 'Palmer Circle Drive',         lat: 30.26017, lng: -97.75345 },
+  'zach':        { name: 'Zach Theatre',                lat: 30.26492, lng: -97.75797 },
+  'alamo':       { name: 'Alamo Lamar',                 lat: 30.25628, lng: -97.76151 },
+  'rollins':     { name: 'Rollins Theater',             lat: 30.25964, lng: -97.75392 },
+  'rivian':      { name: 'Rivian',                      lat: 30.25977, lng: -97.74622 },
+  'continental': { name: 'Continental Club / SoCo',     lat: 30.25044, lng: -97.74922 },
+};
+
+const STOP_VENUES = {
+  'congress':    'Convention Center, Hilton Austin',
+  'paramount':   'Paramount Theatre, Driskill Hotel',
+  'downright':   'Mohawk, Stubb\'s BBQ',
+  'shangrila':   'East 6th bars',
+  'hotelvegas':  'Volstead Lounge, East Side',
+  'violetcrown': 'ACL Live, Moody Theater',
+  'palmer':      'Palmer Events Center',
+  'zach':        'Zach Theatre, Lamar Union',
+  'alamo':       'Alamo Drafthouse Lamar',
+  'rollins':     'Long Center, Rollins Theatre',
+  'rivian':      'Rivian Hub',
+  'continental': 'Continental Club, SoCo shops',
+};
+
+const DAY_ROUTE = ['congress','paramount','downright','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
+const NIGHT_ROUTE = ['congress','paramount','downright','shangrila','hotelvegas','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
+
+function isNightMode() {
+  const h = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
+  return h >= 19;
+}
+
+function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
+
+function buildGoogleMapsUrl(route) {
+  const first = ALL_STOPS[route[0]];
+  // Origin = first stop, destination = first stop (loop)
+  const origin = `${first.lat},${first.lng}`;
+  const destination = origin;
+  // Waypoints = stops 2 through last
+  const waypoints = route.slice(1).map(key => {
+    const s = ALL_STOPS[key];
+    return `${s.lat},${s.lng}`;
+  }).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+}
+
+function buildSingleStopUrl(key) {
+  const s = ALL_STOPS[key];
+  return `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`;
+}
+
+function render() {
+  const night = isNightMode();
+  const route = getActiveRoute();
+
+  // Header
+  const badge = document.getElementById('routeBadge');
+  badge.textContent = night ? '🌙 Night Route' : '☀️ Day Route';
+  badge.className = 'route-badge ' + (night ? 'night' : 'day');
+  document.getElementById('stopCount').textContent = `${route.length} stops`;
+
+  // Full route link
+  const fullUrl = buildGoogleMapsUrl(route);
+  document.getElementById('startNavFooter').href = fullUrl;
+
+  // Stop list
+  const list = document.getElementById('stopList');
+  list.innerHTML = '';
+  route.forEach((key, i) => {
+    const stop = ALL_STOPS[key];
+    const venues = STOP_VENUES[key] || '';
+    const isNightOnly = stop.nightOnly;
+
+    const item = document.createElement('div');
+    item.className = 'stop-item';
+    item.dataset.index = i;
+
+    let numClass = 'stop-num';
+    if (i === 0) numClass += ' first';
+    else if (isNightOnly) numClass += ' night-only';
+
+    item.innerHTML = `
+      <div class="${numClass}">${i + 1}</div>
+      <div class="stop-info">
+        <div class="stop-name">${stop.name}</div>
+        <div class="stop-venues">${venues}</div>
+        ${isNightOnly ? '<span class="stop-night-tag">Night Only</span>' : ''}
+      </div>
+      <a class="nav-btn" href="${buildSingleStopUrl(key)}" target="_blank" rel="noopener">Navigate</a>
+    `;
+
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.nav-btn')) return;
+      if (!document.getElementById('checklistMode').checked) return;
+      item.classList.toggle('checked');
+    });
+
+    list.appendChild(item);
+  });
+}
+
+render();
+// Re-render at the top of every hour to catch day/night switch
+setInterval(() => { render(); }, 60000);
+</script>
+</body>
+</html>

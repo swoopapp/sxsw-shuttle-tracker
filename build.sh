@@ -5,4 +5,5 @@ echo "MAPBOX_TOKEN is set: $([ -n "$MAPBOX_TOKEN" ] && echo 'yes' || echo 'no')"
 mkdir -p public
 awk '{gsub(/__MAPBOX_TOKEN__/, ENVIRON["MAPBOX_TOKEN"]); print}' src.html > public/index.html
 cp admin.html public/admin.html
+cp driver.html public/driver.html
 echo "Build complete."
