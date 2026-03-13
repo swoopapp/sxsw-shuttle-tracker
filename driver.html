@@ -150,6 +150,7 @@ const ALL_STOPS = {
   'shangrila':   { name: 'Shangri-La',                  lat: 30.26499, lng: -97.73198, nightOnly: true },
   'hotelvegas':  { name: 'Hotel Vegas / Low Down',      lat: 30.26357, lng: -97.72785, nightOnly: true },
   'violetcrown': { name: 'Violet Crown / ACL Live',     lat: 30.26576, lng: -97.74597 },
+  'w3rd':        { name: '101 W 3rd St',                lat: 30.26530, lng: -97.74420 },
   'palmer':      { name: 'Palmer Circle Drive',         lat: 30.26017, lng: -97.75345 },
   'zach':        { name: 'Zach Theatre',                lat: 30.26492, lng: -97.75797 },
   'alamo':       { name: 'Alamo Lamar',                 lat: 30.25628, lng: -97.76151 },
@@ -165,6 +166,7 @@ const STOP_VENUES = {
   'shangrila':   'East 6th bars',
   'hotelvegas':  'Volstead Lounge, East Side',
   'violetcrown': 'ACL Live, Moody Theater',
+  'w3rd':        '101 W 3rd St',
   'palmer':      'Palmer Events Center',
   'zach':        'Zach Theatre, Lamar Union',
   'alamo':       'Alamo Drafthouse Lamar',
@@ -173,7 +175,7 @@ const STOP_VENUES = {
   'continental': 'Continental Club, SoCo shops',
 };
 
-const DAY_ROUTE = ['congress','paramount','downright','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
+const DAY_ROUTE = ['congress','paramount','downright','violetcrown','w3rd','palmer','zach','alamo','rollins','rivian','continental'];
 const NIGHT_ROUTE = ['congress','paramount','downright','shangrila','hotelvegas','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
 
 function isNightMode() {
