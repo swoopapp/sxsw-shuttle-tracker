@@ -3,146 +3,175 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>SXSW Shuttle - Driver Route</title>
+<title>SXSW Shuttle - Driver Nav</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #0a0a0a; color: #e0e0e0; min-height: 100vh;
-    padding: 0 0 100px;
+    background: #111; color: #fff; min-height: 100vh;
+    display: flex; flex-direction: column;
+    -webkit-user-select: none; user-select: none;
   }
 
-  .header {
-    position: sticky; top: 0; z-index: 10;
-    background: rgba(15,15,15,0.95); backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    padding: 16px 20px;
-  }
-  .header h1 { font-size: 18px; font-weight: 700; color: #fff; }
-  .header-sub { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-  .route-badge {
-    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px;
-  }
-  .route-badge.day { background: rgba(249,115,22,0.15); color: #f97316; }
-  .route-badge.night { background: rgba(34,197,94,0.15); color: #22c55e; }
-  .stop-count { font-size: 12px; color: #666; }
+  /* ── Progress bar ── */
+  .progress-bar { height: 4px; background: #222; width: 100%; }
+  .progress-fill { height: 100%; background: #22c55e; transition: width 0.4s ease; }
 
-  .start-btn {
-    display: block; margin: 16px 20px; padding: 16px;
-    background: #22c55e; border: none; border-radius: 12px;
-    color: #fff; font-size: 16px; font-weight: 700;
-    cursor: pointer; text-align: center; text-decoration: none;
-    transition: background 0.15s;
+  /* ── Top bar ── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: #161616;
+    border-bottom: 1px solid #222;
   }
-  .start-btn:hover { background: #16a34a; }
-  .start-btn:active { background: #15803d; }
-  .start-btn-sub { font-size: 11px; font-weight: 400; opacity: 0.8; margin-top: 4px; }
+  .route-label { font-size: 13px; font-weight: 600; color: #888; }
+  .route-label span { color: #22c55e; }
+  .lap-label { font-size: 12px; color: #555; }
 
-  .stop-list { padding: 0 20px; }
+  /* ── Current stop hero ── */
+  .hero {
+    padding: 24px 20px 20px; text-align: center;
+    background: linear-gradient(180deg, #161616 0%, #111 100%);
+  }
+  .hero-label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .hero-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 52px; height: 52px; border-radius: 50%; margin-bottom: 12px;
+    font-size: 22px; font-weight: 800;
+    background: rgba(99,102,241,0.25); border: 3px solid rgba(99,102,241,0.6); color: #a5b4fc;
+  }
+  .hero-name { font-size: 26px; font-weight: 800; color: #fff; line-height: 1.2; }
+  .hero-venues { font-size: 13px; color: #666; margin-top: 6px; }
 
-  .stop-item {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+  /* ── Directions card ── */
+  .directions {
+    flex: 1; overflow-y: auto; padding: 0 16px 120px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dir-header {
+    font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 16px 4px 8px;
   }
 
-  .stop-num {
-    width: 36px; height: 36px; border-radius: 50%;
+  .step {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px; margin-bottom: 8px;
+    background: #1a1a1a; border-radius: 12px;
+    border: 1px solid #222;
+  }
+  .step.active-step {
+    background: rgba(99,102,241,0.08);
+    border-color: rgba(99,102,241,0.3);
+  }
+
+  .step-icon {
+    width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
-    background: rgba(99,102,241,0.3); border: 2px solid rgba(99,102,241,0.5);
+    font-size: 22px;
   }
-  .stop-num.night-only {
-    background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.5); color: #86efac;
-  }
-  .stop-num.first {
-    background: rgba(249,115,22,0.3); border-color: rgba(249,115,22,0.6); color: #fdba74;
-  }
+  .step-icon.straight { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .step-icon.left { background: rgba(249,115,22,0.15); color: #f97316; }
+  .step-icon.right { background: rgba(168,85,247,0.15); color: #a855f7; }
+  .step-icon.merge { background: rgba(20,184,166,0.15); color: #14b8a6; }
+  .step-icon.arrive { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .step-icon.uturn { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .step-icon.slight-left { background: rgba(234,179,8,0.15); color: #eab308; }
+  .step-icon.slight-right { background: rgba(236,72,153,0.15); color: #ec4899; }
 
-  .stop-info { flex: 1; min-width: 0; }
-  .stop-name { font-size: 15px; font-weight: 600; color: #ddd; }
-  .stop-venues { font-size: 11px; color: #666; margin-top: 2px; }
-  .stop-night-tag {
-    font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
-    background: rgba(34,197,94,0.15); color: #22c55e; margin-top: 4px; display: inline-block;
+  .step-body { flex: 1; padding-top: 2px; }
+  .step-instruction { font-size: 16px; font-weight: 600; color: #eee; line-height: 1.3; }
+  .step-detail { font-size: 12px; color: #666; margin-top: 4px; }
+
+  /* ── Upcoming stops ── */
+  .upcoming { padding: 0 16px; }
+  .upcoming-header {
+    font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 4px 4px 10px;
   }
-
-  .nav-btn {
-    flex-shrink: 0; padding: 8px 14px;
-    background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3);
-    border-radius: 8px; color: #60a5fa; font-size: 12px; font-weight: 600;
-    text-decoration: none; cursor: pointer;
-    transition: all 0.15s;
+  .upcoming-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; margin-bottom: 6px;
+    background: #1a1a1a; border-radius: 10px; border: 1px solid #222;
   }
-  .nav-btn:hover { background: rgba(59,130,246,0.25); color: #93c5fd; }
-
-  .loop-note {
-    margin: 16px 20px; padding: 12px 16px;
-    background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.2);
-    border-radius: 10px; font-size: 12px; color: #f97316;
+  .upcoming-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; background: #222; color: #666;
   }
-  .loop-note strong { color: #fdba74; }
+  .upcoming-name { font-size: 14px; color: #888; }
+  .upcoming-done .upcoming-num { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .upcoming-done .upcoming-name { color: #444; text-decoration: line-through; }
+  .upcoming-current .upcoming-num { background: rgba(99,102,241,0.25); color: #a5b4fc; border: 2px solid rgba(99,102,241,0.5); }
+  .upcoming-current .upcoming-name { color: #fff; font-weight: 600; }
 
-  .section-title {
-    font-size: 12px; font-weight: 700; color: #555; text-transform: uppercase;
-    letter-spacing: 0.5px; padding: 16px 20px 8px; margin-top: 8px;
-  }
-
-  .checklist-toggle {
-    display: flex; align-items: center; gap: 8px; margin: 12px 20px 0;
-    font-size: 13px; color: #888; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .checklist-toggle input { width: 18px; height: 18px; accent-color: #22c55e; }
-
-  .stop-item.checked .stop-name { text-decoration: line-through; color: #555; }
-  .stop-item.checked .stop-num { opacity: 0.3; }
-
-  .footer {
+  /* ── Bottom actions ── */
+  .bottom-bar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    padding: 12px 20px; background: rgba(15,15,15,0.95);
-    backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 16px 20px; padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background: rgba(17,17,17,0.95); backdrop-filter: blur(12px);
+    border-top: 1px solid #222;
     display: flex; gap: 10px;
   }
-  .footer a {
-    flex: 1; padding: 12px; border-radius: 10px; text-align: center;
-    text-decoration: none; font-size: 13px; font-weight: 600;
+  .btn-arrived {
+    flex: 1; padding: 16px; border: none; border-radius: 12px;
+    background: #22c55e; color: #fff;
+    font-size: 17px; font-weight: 700; cursor: pointer;
+    transition: all 0.15s;
   }
-  .footer .primary { background: #22c55e; color: #fff; }
-  .footer .secondary {
-    background: rgba(255,255,255,0.06); color: #aaa;
-    border: 1px solid rgba(255,255,255,0.1);
+  .btn-arrived:active { background: #16a34a; transform: scale(0.98); }
+  .btn-prev {
+    width: 52px; border: 1px solid #333; border-radius: 12px;
+    background: #1a1a1a; color: #888;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
+  .btn-prev:active { background: #222; }
+  .btn-prev:disabled { opacity: 0.3; }
+
+  /* ── Route list view ── */
+  .view-toggle {
+    position: absolute; top: 12px; right: 16px;
+    padding: 6px 12px; border: 1px solid #333; border-radius: 8px;
+    background: #1a1a1a; color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer;
+  }
+  .view-toggle:active { background: #222; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Driver Route Guide</h1>
-  <div class="header-sub">
-    <span class="route-badge" id="routeBadge"></span>
-    <span class="stop-count" id="stopCount"></span>
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+<div class="top-bar">
+  <div>
+    <div class="route-label" id="routeLabel"></div>
   </div>
+  <div class="lap-label" id="lapLabel">Lap 1</div>
+  <button class="view-toggle" id="viewToggle" onclick="toggleView()">All Stops</button>
 </div>
 
-<div class="loop-note">
-  <strong>Loop Route:</strong> After the last stop, return to Stop #1 and repeat.
-  Google Maps will navigate you through every stop in order.
+<div id="navView">
+  <div class="hero">
+    <div class="hero-label" id="heroLabel">Next Stop</div>
+    <div class="hero-num" id="heroNum"></div>
+    <div class="hero-name" id="heroName"></div>
+    <div class="hero-venues" id="heroVenues"></div>
+  </div>
+
+  <div class="directions" id="directions"></div>
 </div>
 
-<label class="checklist-toggle">
-  <input type="checkbox" id="checklistMode"> Enable stop checklist (tap stops to mark done)
-</label>
+<div id="listView" style="display:none; flex:1; overflow-y:auto; padding-bottom:100px;">
+  <div class="upcoming" id="allStopsList" style="padding-top:16px;"></div>
+</div>
 
-<div class="section-title">Route Stops (in order)</div>
-<div class="stop-list" id="stopList"></div>
-
-<div class="footer">
-  <a href="#" class="primary" id="startNavFooter">▶ Start Full Route</a>
-  <a href="/" class="secondary">Back to Tracker</a>
+<div class="bottom-bar">
+  <button class="btn-prev" id="btnPrev" onclick="prevStop()">‹</button>
+  <button class="btn-arrived" id="btnArrived" onclick="nextStop()">Arrived → Next Stop</button>
 </div>
 
 <script>
+// ── Stop Data ──
 const ALL_STOPS = {
   'congress':    { name: '3rd & Congress',              lat: 30.26505, lng: -97.74374 },
   'paramount':   { name: 'Paramount / F&TV Clubhouse',  lat: 30.26992, lng: -97.74190 },
@@ -178,82 +207,239 @@ const STOP_VENUES = {
 const DAY_ROUTE = ['congress','paramount','downright','violetcrown','w3rd','palmer','zach','alamo','rollins','rivian','continental'];
 const NIGHT_ROUTE = ['congress','paramount','downright','shangrila','hotelvegas','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
 
+// ── Turn-by-turn directions between consecutive stops ──
+// icon: straight, left, right, slight-left, slight-right, merge, uturn, arrive
+const DIRECTIONS = {
+  // ── DAY ROUTE ──
+  'congress>paramount': [
+    { icon: 'straight', instruction: 'Head north on Congress Ave', detail: 'Past 4th, 5th, 6th St' },
+    { icon: 'arrive', instruction: 'Paramount Theatre is on your right', detail: 'Near 7th & Congress' },
+  ],
+  'paramount>downright': [
+    { icon: 'right', instruction: 'Turn right on E 7th St', detail: 'Head east' },
+    { icon: 'straight', instruction: 'Continue on E 7th St', detail: 'Past Trinity, Neches' },
+    { icon: 'arrive', instruction: 'Downright / Music Clubhouse on your right', detail: 'Near Red River & 7th' },
+  ],
+  'downright>violetcrown': [
+    { icon: 'left', instruction: 'Head south on Red River St', detail: 'Toward 6th St' },
+    { icon: 'right', instruction: 'Turn right on E 5th St', detail: 'Head west' },
+    { icon: 'straight', instruction: 'Continue west on 5th St', detail: 'Past Congress Ave' },
+    { icon: 'slight-left', instruction: 'Continue onto W 2nd St / Lavaca', detail: '' },
+    { icon: 'arrive', instruction: 'Violet Crown / ACL Live on your left', detail: 'Willie Nelson Blvd area' },
+  ],
+  'violetcrown>w3rd': [
+    { icon: 'right', instruction: 'Head east on W 3rd St', detail: 'Short drive' },
+    { icon: 'arrive', instruction: '101 W 3rd St on your right', detail: '' },
+  ],
+  'w3rd>palmer': [
+    { icon: 'straight', instruction: 'Continue south toward Cesar Chavez', detail: '' },
+    { icon: 'right', instruction: 'Turn right on Barton Springs Rd', detail: 'Head west, cross the bridge' },
+    { icon: 'arrive', instruction: 'Palmer Circle Drive on your right', detail: 'Palmer Events Center' },
+  ],
+  'palmer>zach': [
+    { icon: 'straight', instruction: 'Continue west on Barton Springs Rd', detail: '' },
+    { icon: 'right', instruction: 'Turn right on S Lamar Blvd', detail: 'Head north' },
+    { icon: 'arrive', instruction: 'Zach Theatre on your left', detail: 'Lamar Union area' },
+  ],
+  'zach>alamo': [
+    { icon: 'straight', instruction: 'Continue south on S Lamar Blvd', detail: '' },
+    { icon: 'arrive', instruction: 'Alamo Drafthouse Lamar on your left', detail: 'S Lamar Blvd' },
+  ],
+  'alamo>rollins': [
+    { icon: 'left', instruction: 'Head east on Riverside Dr', detail: '' },
+    { icon: 'right', instruction: 'Turn right on S 1st St', detail: 'Head south briefly' },
+    { icon: 'arrive', instruction: 'Rollins Theater / Long Center on your right', detail: '' },
+  ],
+  'rollins>rivian': [
+    { icon: 'straight', instruction: 'Head east on Barton Springs Rd', detail: '' },
+    { icon: 'arrive', instruction: 'Rivian Hub on your right', detail: 'Near S 1st St' },
+  ],
+  'rivian>continental': [
+    { icon: 'right', instruction: 'Head south on S Congress Ave', detail: '' },
+    { icon: 'arrive', instruction: 'Continental Club / SoCo on your right', detail: 'S Congress Ave' },
+  ],
+  'continental>congress': [
+    { icon: 'straight', instruction: 'Head north on S Congress Ave', detail: 'Cross the bridge' },
+    { icon: 'arrive', instruction: 'Back at 3rd & Congress', detail: 'Loop complete — starting over' },
+  ],
+
+  // ── NIGHT ROUTE (extra segments) ──
+  'downright>shangrila': [
+    { icon: 'left', instruction: 'Head south on Red River St', detail: 'Toward E 6th St' },
+    { icon: 'right', instruction: 'Turn right on E 6th St', detail: 'Head east' },
+    { icon: 'arrive', instruction: 'Shangri-La on your left', detail: 'East 6th bars district' },
+  ],
+  'shangrila>hotelvegas': [
+    { icon: 'straight', instruction: 'Continue east on E 6th St', detail: '' },
+    { icon: 'arrive', instruction: 'Hotel Vegas / Low Down on your right', detail: 'Far east side' },
+  ],
+  'hotelvegas>violetcrown': [
+    { icon: 'left', instruction: 'Head west on E 6th St', detail: 'Back toward downtown' },
+    { icon: 'straight', instruction: 'Continue west past Congress', detail: 'Becomes W 5th / 6th area' },
+    { icon: 'slight-right', instruction: 'Merge onto W 2nd St / Lavaca', detail: '' },
+    { icon: 'arrive', instruction: 'Violet Crown / ACL Live on your left', detail: 'Willie Nelson Blvd area' },
+  ],
+  // Night route: violetcrown goes straight to palmer (no w3rd stop)
+  'violetcrown>palmer': [
+    { icon: 'straight', instruction: 'Head south toward Cesar Chavez', detail: '' },
+    { icon: 'right', instruction: 'Turn right on Barton Springs Rd', detail: 'Head west, cross the bridge' },
+    { icon: 'arrive', instruction: 'Palmer Circle Drive on your right', detail: 'Palmer Events Center' },
+  ],
+};
+
+// ── State ──
 function isNightMode() {
   const h = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
   return h >= 19;
 }
-
 function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
 
-function buildGoogleMapsUrl(route) {
-  // Path-based format opens directly in Google Maps app with Start button
-  const points = route.map(key => {
-    const s = ALL_STOPS[key];
-    return `${s.lat},${s.lng}`;
-  });
-  // Add first stop again at the end for the loop
-  points.push(points[0]);
-  return `https://www.google.com/maps/dir/${points.join('/')}`;
+let currentIdx = parseInt(localStorage.getItem('driverStopIdx') || '0');
+let lapCount = parseInt(localStorage.getItem('driverLapCount') || '1');
+let showList = false;
+
+function save() {
+  localStorage.setItem('driverStopIdx', currentIdx);
+  localStorage.setItem('driverLapCount', lapCount);
 }
 
-function buildSingleStopUrl(key) {
-  const s = ALL_STOPS[key];
-  return `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;
-}
-
+// ── Render ──
 function render() {
   const night = isNightMode();
   const route = getActiveRoute();
 
-  // Header
-  const badge = document.getElementById('routeBadge');
-  badge.textContent = night ? '🌙 Night Route' : '☀️ Day Route';
-  badge.className = 'route-badge ' + (night ? 'night' : 'day');
-  document.getElementById('stopCount').textContent = `${route.length} stops`;
+  // Clamp index
+  if (currentIdx >= route.length) { currentIdx = 0; lapCount++; save(); }
 
-  // Full route link
-  const fullUrl = buildGoogleMapsUrl(route);
-  document.getElementById('startNavFooter').href = fullUrl;
+  const stopKey = route[currentIdx];
+  const stop = ALL_STOPS[stopKey];
+  const venues = STOP_VENUES[stopKey] || '';
 
-  // Stop list
-  const list = document.getElementById('stopList');
-  list.innerHTML = '';
-  route.forEach((key, i) => {
-    const stop = ALL_STOPS[key];
-    const venues = STOP_VENUES[key] || '';
-    const isNightOnly = stop.nightOnly;
+  // Progress
+  document.getElementById('progress').style.width = `${((currentIdx) / route.length) * 100}%`;
 
-    const item = document.createElement('div');
-    item.className = 'stop-item';
-    item.dataset.index = i;
+  // Top bar
+  document.getElementById('routeLabel').innerHTML = night
+    ? '🌙 Night Route — <span>Stop ' + (currentIdx + 1) + ' of ' + route.length + '</span>'
+    : '☀️ Day Route — <span>Stop ' + (currentIdx + 1) + ' of ' + route.length + '</span>';
+  document.getElementById('lapLabel').textContent = 'Lap ' + lapCount;
 
-    let numClass = 'stop-num';
-    if (i === 0) numClass += ' first';
-    else if (isNightOnly) numClass += ' night-only';
+  // Hero
+  document.getElementById('heroLabel').textContent = currentIdx === 0 ? 'Starting At' : 'Next Stop';
+  document.getElementById('heroNum').textContent = currentIdx + 1;
+  document.getElementById('heroName').textContent = stop.name;
+  document.getElementById('heroVenues').textContent = venues;
 
-    item.innerHTML = `
-      <div class="${numClass}">${i + 1}</div>
-      <div class="stop-info">
-        <div class="stop-name">${stop.name}</div>
-        <div class="stop-venues">${venues}</div>
-        ${isNightOnly ? '<span class="stop-night-tag">Night Only</span>' : ''}
+  // Directions (from previous stop to current)
+  const dirEl = document.getElementById('directions');
+  if (currentIdx === 0) {
+    dirEl.innerHTML = `
+      <div class="dir-header">You're at the starting point</div>
+      <div class="step active-step">
+        <div class="step-icon arrive">📍</div>
+        <div class="step-body">
+          <div class="step-instruction">Begin your route from here</div>
+          <div class="step-detail">Tap "Arrived → Next Stop" when ready to depart</div>
+        </div>
       </div>
-      <a class="nav-btn" href="${buildSingleStopUrl(key)}" target="_blank" rel="noopener">Navigate</a>
     `;
+  } else {
+    const prevKey = route[currentIdx - 1];
+    const segKey = prevKey + '>' + stopKey;
+    const steps = DIRECTIONS[segKey] || [{ icon: 'straight', instruction: 'Head to ' + stop.name, detail: 'Follow the route' }];
 
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('.nav-btn')) return;
-      if (!document.getElementById('checklistMode').checked) return;
-      item.classList.toggle('checked');
+    const icons = {
+      'straight': '↑', 'left': '←', 'right': '→',
+      'slight-left': '↖', 'slight-right': '↗',
+      'merge': '⤵', 'uturn': '↩', 'arrive': '📍'
+    };
+
+    let html = `<div class="dir-header">Directions from ${ALL_STOPS[prevKey].name}</div>`;
+    steps.forEach((s, i) => {
+      const isLast = i === steps.length - 1;
+      html += `
+        <div class="step ${isLast ? 'active-step' : ''}">
+          <div class="step-icon ${s.icon}">${icons[s.icon] || '→'}</div>
+          <div class="step-body">
+            <div class="step-instruction">${s.instruction}</div>
+            ${s.detail ? `<div class="step-detail">${s.detail}</div>` : ''}
+          </div>
+        </div>
+      `;
     });
+    dirEl.innerHTML = html;
+  }
 
-    list.appendChild(item);
-  });
+  // Prev button
+  document.getElementById('btnPrev').disabled = (currentIdx === 0 && lapCount <= 1);
+
+  // Arrived button text
+  const btn = document.getElementById('btnArrived');
+  if (currentIdx === 0) {
+    btn.textContent = 'Depart → Head to Stop 2';
+  } else if (currentIdx === route.length - 1) {
+    btn.textContent = 'Arrived → Complete Lap ' + lapCount;
+  } else {
+    btn.textContent = 'Arrived → Next Stop';
+  }
+
+  // All stops list
+  renderList(route);
 }
 
+function renderList(route) {
+  const el = document.getElementById('allStopsList');
+  let html = '<div class="upcoming-header">All Stops</div>';
+  route.forEach((key, i) => {
+    const stop = ALL_STOPS[key];
+    let cls = 'upcoming-item';
+    if (i < currentIdx) cls += ' upcoming-done';
+    if (i === currentIdx) cls += ' upcoming-current';
+    html += `
+      <div class="${cls}">
+        <div class="upcoming-num">${i < currentIdx ? '✓' : i + 1}</div>
+        <div class="upcoming-name">${stop.name}</div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function nextStop() {
+  const route = getActiveRoute();
+  currentIdx++;
+  if (currentIdx >= route.length) {
+    currentIdx = 0;
+    lapCount++;
+  }
+  save();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function prevStop() {
+  if (currentIdx > 0) {
+    currentIdx--;
+  } else if (lapCount > 1) {
+    const route = getActiveRoute();
+    currentIdx = route.length - 1;
+    lapCount--;
+  }
+  save();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleView() {
+  showList = !showList;
+  document.getElementById('navView').style.display = showList ? 'none' : '';
+  document.getElementById('listView').style.display = showList ? '' : 'none';
+  document.getElementById('viewToggle').textContent = showList ? 'Navigation' : 'All Stops';
+}
+
+// ── Init ──
 render();
-// Re-render at the top of every hour to catch day/night switch
-setInterval(() => { render(); }, 60000);
+setInterval(render, 60000);
 </script>
 </body>
 </html>
