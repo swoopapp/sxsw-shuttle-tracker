@@ -1,4 +1,4 @@
 #!/bin/bash
 # Replace placeholder with Mapbox token from environment variable
-sed -i.bak "s|__MAPBOX_TOKEN__|${MAPBOX_TOKEN}|g" public/index.html
-rm -f public/index.html.bak
+export MAPBOX_TOKEN="${MAPBOX_TOKEN}"
+awk '{gsub(/__MAPBOX_TOKEN__/, ENVIRON["MAPBOX_TOKEN"]); print}' public/index.html > public/index.tmp && mv public/index.tmp public/index.html
