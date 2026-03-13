@@ -1469,87 +1469,32 @@ const DAY_ROUTE_GEO = [
   [-97.74466, 30.26302],
 ];
 
-// Night route: same as day but adds East Austin extension between Downright and Violet Crown
+// Night route: reuses day route geometry + adds East Austin extension (Downright → Shangri-La → Hotel Vegas → back)
+// Built dynamically: day route up to Downright, then hand-drawn east extension, then day route from Violet Crown onward
+const NIGHT_EAST_EXTENSION = [
+  // DOWNRIGHT → E toward Shangri-La / Hotel Vegas
+  [-97.73360, 30.27067],
+  [-97.72445, 30.26744],
+  // HOTEL VEGAS area → S loop
+  [-97.72652, 30.26304],
+  // W back toward main route
+  [-97.73417, 30.26568],
+  [-97.73248, 30.27030],
+  // → W toward Paramount / Violet Crown
+  [-97.73246, 30.27028],
+  [-97.74077, 30.27268],
+  [-97.74076, 30.27268],
+  [-97.74450, 30.27371],
+  [-97.74496, 30.27256],
+];
+
+// Stitch: day route start → Downright, then east extension, then day route from Violet Crown → end
+const _dayDownrightIdx = DAY_ROUTE_GEO.findIndex(c => Math.abs(c[0] - (-97.74385)) < 0.001 && Math.abs(c[1] - 30.26527) < 0.001);
+const _dayVioletIdx = DAY_ROUTE_GEO.findIndex(c => Math.abs(c[0] - (-97.74420)) < 0.001 && Math.abs(c[1] - 30.26530) < 0.001);
 const NIGHT_ROUTE_GEO = [
-  // 3RD & CONGRESS → N on Congress Ave
-  [-97.74374, 30.26505],
-  [-97.74370, 30.26600],
-  [-97.74365, 30.26700],
-  [-97.74360, 30.26800],
-  [-97.74355, 30.26900],
-  // PARAMOUNT / F&TV CLUBHOUSE → continue N
-  [-97.74350, 30.26992],
-  [-97.74345, 30.27050],
-  // Turn E on ~8th/9th St
-  [-97.74200, 30.27060],
-  [-97.74000, 30.27070],
-  [-97.73800, 30.27080],
-  // DOWNRIGHT / MUSIC CLUBHOUSE
-  [-97.73568, 30.27114],
-  // Continue E / SE on 6th St toward East Austin
-  [-97.73500, 30.27000],
-  [-97.73400, 30.26850],
-  [-97.73350, 30.26700],
-  [-97.73300, 30.26600],
-  // SHANGRI-LA (E 6th St)
-  [-97.73198, 30.26499],
-  // Continue E toward Hotel Vegas
-  [-97.73050, 30.26450],
-  [-97.72900, 30.26400],
-  // HOTEL VEGAS / LOW DOWN
-  [-97.72785, 30.26357],
-  // S and W loop back via E Cesar Chavez
-  [-97.72800, 30.26250],
-  [-97.72850, 30.26100],
-  [-97.73000, 30.26000],
-  [-97.73200, 30.25950],
-  [-97.73400, 30.25980],
-  [-97.73600, 30.26050],
-  [-97.73800, 30.26150],
-  [-97.74000, 30.26250],
-  [-97.74200, 30.26350],
-  [-97.74400, 30.26450],
-  // VIOLET CROWN / ACL LIVE
-  [-97.74597, 30.26576],
-  // SW on Cesar Chavez / Barton Springs — same as day from here
-  [-97.74700, 30.26500],
-  [-97.74850, 30.26380],
-  [-97.75000, 30.26250],
-  [-97.75150, 30.26130],
-  [-97.75345, 30.26017],  // PALMER
-  [-97.75500, 30.26100],
-  [-97.75650, 30.26250],
-  [-97.75750, 30.26400],
-  [-97.75797, 30.26492],  // ZACH
-  [-97.75850, 30.26400],
-  [-97.75950, 30.26200],
-  [-97.76050, 30.26000],
-  [-97.76100, 30.25800],
-  [-97.76151, 30.25628],  // ALAMO
-  [-97.76000, 30.25650],
-  [-97.75800, 30.25700],
-  [-97.75600, 30.25800],
-  [-97.75392, 30.25964],  // ROLLINS
-  [-97.75200, 30.25970],
-  [-97.75000, 30.25975],
-  [-97.74800, 30.25977],
-  [-97.74622, 30.25977],  // RIVIAN
-  [-97.74620, 30.25850],
-  [-97.74615, 30.25700],
-  [-97.74610, 30.25550],
-  [-97.74700, 30.25450],
-  [-97.74800, 30.25350],
-  [-97.74880, 30.25250],
-  [-97.74900, 30.25150],
-  [-97.74922, 30.25044],  // CONTINENTAL
-  [-97.74920, 30.25150],
-  [-97.74900, 30.25350],
-  [-97.74880, 30.25550],
-  [-97.74700, 30.25700],
-  [-97.74600, 30.25900],
-  [-97.74500, 30.26100],
-  [-97.74420, 30.26300],
-  [-97.74374, 30.26505],  // 3RD & CONGRESS
+  ...DAY_ROUTE_GEO.slice(0, _dayDownrightIdx + 1),
+  ...NIGHT_EAST_EXTENSION,
+  ...DAY_ROUTE_GEO.slice(_dayVioletIdx),
 ];
 
 // ── Render route lines from static GeoJSON ──
