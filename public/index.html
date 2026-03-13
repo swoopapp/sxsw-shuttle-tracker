@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SXSW Shuttle Tracker</title>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; overflow: hidden; }
+  #map { width: 100%; height: 100vh; }
+
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    background: rgba(15, 15, 15, 0.92); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+    padding: 16px; width: 320px; max-height: calc(100vh - 24px);
+    overflow-y: auto; transition: transform 0.3s ease;
+  }
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+  @media (max-width: 640px) {
+    #panel {
+      top: auto; left: 0; right: 0; bottom: 0;
+      width: 100%; max-height: 75vh;
+      border-radius: 16px 16px 0 0;
+      padding: 0 16px 16px;
+      transform: translateY(calc(100% - 64px));
+      will-change: transform;
+    }
+    #panel.expanded { transform: translateY(0); }
+    #panel.expanded .drawer-handle-bar { margin-bottom: 4px; }
+    .drawer-handle {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 10px 0 6px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .drawer-handle-bar {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.25); margin-bottom: 8px;
+    }
+    .drawer-peek {
+      display: flex; align-items: center; justify-content: space-between; width: 100%;
+    }
+    .drawer-peek-title { font-size: 14px; font-weight: 700; color: #fff; }
+    .drawer-peek-status { font-size: 11px; color: #888; }
+  }
+  @media (min-width: 641px) { .drawer-handle { display: none; } }
+
+  #panel h1 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+  #panel .subtitle { font-size: 11px; color: #888; margin-bottom: 12px; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #888; margin-bottom: 12px;
+    padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+  .status-dot.polling { animation: pulse 1s ease-in-out; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .route-badge {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-bottom: 12px;
+  }
+  .route-badge.day { background: rgba(249,115,22,0.15); color: #f97316; }
+  .route-badge.night { background: rgba(34,197,94,0.15); color: #22c55e; }
+
+  .panel-body { }
+  @media (max-width: 640px) {
+    .panel-body { display: none; }
+    #panel.expanded .panel-body { display: block; }
+  }
+
+  .tab-bar {
+    display: flex; gap: 0; margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .tab-btn {
+    flex: 1; padding: 8px 0; background: none; border: none;
+    color: #666; font-size: 11px; font-weight: 600; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .tab-btn:hover { color: #aaa; }
+  .tab-btn.active { color: #a5b4fc; border-bottom-color: #6366f1; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .shuttle-list { display: flex; flex-direction: column; gap: 4px; }
+  .shuttle-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .shuttle-item:hover { background: rgba(255,255,255,0.06); }
+  .shuttle-item.inactive { opacity: 0.35; }
+  .shuttle-badge {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .shuttle-info { flex: 1; min-width: 0; }
+  .shuttle-name { font-size: 13px; font-weight: 600; color: #ddd; }
+  .shuttle-meta { font-size: 10px; color: #666; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shuttle-eta { font-size: 10px; color: #f97316; margin-top: 1px; }
+  .shuttle-active-tag {
+    font-size: 9px; font-weight: 600; padding: 2px 6px;
+    border-radius: 4px; background: rgba(34,197,94,0.15); color: #22c55e; flex-shrink: 0;
+  }
+  .shuttle-inactive-tag {
+    font-size: 9px; font-weight: 600; padding: 2px 6px;
+    border-radius: 4px; background: rgba(255,255,255,0.05); color: #555; flex-shrink: 0;
+  }
+
+  /* Stop arrivals board */
+  .stop-card {
+    margin-bottom: 8px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden; transition: all 0.15s;
+  }
+  .stop-card:hover { border-color: rgba(255,255,255,0.12); }
+  .stop-card-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; cursor: pointer;
+    background: rgba(255,255,255,0.02);
+  }
+  .stop-card-number {
+    width: 26px; height: 26px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    background: rgba(99,102,241,0.3); border: 1px solid rgba(99,102,241,0.5);
+  }
+  .stop-card-number.night-only {
+    background: rgba(34,197,94,0.2); border-color: rgba(34,197,94,0.5); color: #86efac;
+  }
+  .stop-card-info { flex: 1; min-width: 0; }
+  .stop-card-name { font-size: 13px; font-weight: 600; color: #ddd; }
+  .stop-card-summary { font-size: 10px; color: #666; margin-top: 1px; }
+  .stop-card-body { padding: 0 12px 10px; }
+
+  .arrival-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .arrival-row:first-child { border-top: none; }
+  .arrival-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .arrival-info { flex: 1; font-size: 11px; color: #ccc; }
+  .arrival-eta {
+    font-size: 10px; font-weight: 600; flex-shrink: 0; padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .arrival-eta.here { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .arrival-eta.soon { background: rgba(249,115,22,0.15); color: #f97316; }
+  .arrival-eta.later { background: rgba(255,255,255,0.05); color: #888; }
+  .no-arrivals { font-size: 11px; color: #555; padding: 8px 0; }
+
+  .controls {
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 6px;
+  }
+  .controls button {
+    flex: 1; padding: 7px 0; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; background: rgba(255,255,255,0.04);
+    color: #aaa; font-size: 11px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .controls button.active { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); color: #a5b4fc; }
+
+  .mapboxgl-popup-content {
+    background: rgba(15,15,15,0.95) !important; backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px !important;
+    padding: 12px 14px !important; color: #e0e0e0 !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+  }
+  .mapboxgl-popup-tip { border-top-color: rgba(15,15,15,0.95) !important; }
+  .mapboxgl-popup-close-button { color: #888 !important; font-size: 16px !important; }
+  .popup-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .popup-row { font-size: 11px; color: #999; margin-bottom: 2px; }
+  .popup-row span { color: #ddd; }
+
+  .legend {
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #888; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <div class="drawer-handle" id="drawerHandle">
+    <div class="drawer-handle-bar"></div>
+    <div class="drawer-peek">
+      <span class="drawer-peek-title">SXSW Shuttles</span>
+      <span class="drawer-peek-status" id="drawerStatus">Loading...</span>
+    </div>
+  </div>
+
+  <div class="panel-body">
+    <h1>SXSW Shuttle Tracker</h1>
+    <div class="subtitle">Live GPS tracking - Austin, TX - March 2026</div>
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Connecting...</span>
+    </div>
+    <div class="route-badge day" id="routeBadge">Orange Route (Daytime)</div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('shuttles')">Shuttles</button>
+      <button class="tab-btn" onclick="switchTab('ada')">ADA</button>
+      <button class="tab-btn" onclick="switchTab('stops')">Stops</button>
+    </div>
+
+    <div class="tab-content active" id="tab-shuttles">
+      <div class="shuttle-list" id="shuttleList"></div>
+      <div class="controls">
+        <button id="btnAll" onclick="filterShuttles('all')">All</button>
+        <button id="btnActive" class="active" onclick="filterShuttles('active')">Active</button>
+        <button id="btnFit" onclick="fitAll()">Fit Map</button>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-ada">
+      <div style="font-size:11px;color:#888;margin-bottom:10px">ADA accessible shuttles</div>
+      <div class="shuttle-list" id="adaList"></div>
+    </div>
+
+    <div class="tab-content" id="tab-stops">
+      <div id="stopArrivals"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#a5b4fc; border: 1.5px solid #6366f1"></div> Stop</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac; border: 1.5px solid #22c55e"></div> Night only</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Active bus</div>
+    </div>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+const SOLUTION_ID = '6b2dab7ddae2420da0b707dd';
+const API_URL = 'https://liveapi.mapsindoors.com/api/state';
+const MAPBOX_TOKEN = '__MAPBOX_TOKEN__';
+const POLL_INTERVAL = 8000;
+const ACTIVE_THRESHOLD_MS = 60 * 60 * 1000;
+const DWELL_RADIUS_KM = 0.15; // 150m
+const DWELL_POLLS = 3; // 3 polls (~24s) to count as "at stop"
+const ROAD_FACTOR = 1.3; // haversine -> road distance correction for city grid
+const SPEED_HISTORY_SIZE = 5; // rolling window of speed readings
+const MIN_SPEED_KMH = 3; // below this, consider shuttle stopped
+
+// ── Shuttle vehicles ──
+const SHUTTLES = [
+  { id: 'e9525829c53340b4b6bcf62e', name: 'Shuttle 1',  num: 1, ada: true },
+  { id: '3fbe7b87b2514cf88dd2959b', name: 'Shuttle 2',  num: 2, ada: true },
+  { id: 'a8e138aab9c74a1e9afcb051', name: 'Shuttle 3',  num: 3 },
+  { id: '966d0e5cbe024e9a94afb345', name: 'Shuttle 4',  num: 4 },
+  { id: '6638cfc9240f4b41a8273f41', name: 'Shuttle 5',  num: 5 },
+  { id: '99b7d83570cc4d7ba234b653', name: 'Shuttle 6',  num: 6 },
+  { id: '7339ecf0f94949a9a5c0fb6e', name: 'Shuttle 7',  num: 7 },
+  { id: '9e50f5c2ad2c47498f6e30cb', name: 'Shuttle 8',  num: 8 },
+  { id: 'ed0bf01640f54f31870f08cd', name: 'Shuttle 9',  num: 9 },
+  { id: '75c77ccb07274878ac13be62', name: 'Shuttle 10', num: 10 },
+  { id: 'c0237622c71746278279628d', name: 'Shuttle 11', num: 11 },
+  { id: '42cbdeb1a351415cbd9f1dc4', name: 'Shuttle 12', num: 12 },
+];
+
+const SHUTTLE_COLORS = [
+  '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4',
+  '#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e'
+];
+
+// ── All stops ──
+const ALL_STOPS = {
+  'congress':    { name: '3rd & Congress',               lat: 30.26505, lng: -97.74374 },
+  'paramount':   { name: 'Paramount / F&TV Clubhouse',   lat: 30.26992, lng: -97.74190 },
+  'downright':   { name: 'Downright / Music Clubhouse',  lat: 30.27114, lng: -97.73568 },
+  'shangrila':   { name: 'Shangri-La',                   lat: 30.26499, lng: -97.73198, nightOnly: true },
+  'hotelvegas':  { name: 'Hotel Vegas / Low Down',       lat: 30.26357, lng: -97.72785, nightOnly: true },
+  'violetcrown': { name: 'Violet Crown / ACL Live',      lat: 30.26576, lng: -97.74597 },
+  'palmer':      { name: 'Palmer Circle Drive',          lat: 30.26017, lng: -97.75345 },
+  'zach':        { name: 'Zach Theatre',                 lat: 30.26492, lng: -97.75797 },
+  'alamo':       { name: 'Alamo Lamar',                  lat: 30.25628, lng: -97.76151 },
+  'rollins':     { name: 'Rollins Theater',              lat: 30.25964, lng: -97.75392 },
+  'rivian':      { name: 'Rivian',                       lat: 30.25977, lng: -97.74622 },
+  'continental': { name: 'Continental Club / SoCo',      lat: 30.25044, lng: -97.74922 },
+};
+
+const DAY_ROUTE = ['congress','paramount','downright','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
+const NIGHT_ROUTE = ['congress','paramount','downright','shangrila','hotelvegas','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
+
+// ── ETA between consecutive stops [min, max] ──
+const SEGMENT_ETA = {};
+function initETAs() {
+  const allPairs = new Set();
+  [DAY_ROUTE, NIGHT_ROUTE].forEach(route => {
+    for (let i = 0; i < route.length; i++) {
+      allPairs.add(`${route[i]}>${route[(i + 1) % route.length]}`);
+    }
+  });
+  allPairs.forEach(k => { SEGMENT_ETA[k] = [15, 30]; });
+}
+initETAs();
+
+// ── Time-aware route ──
+function isNightMode() {
+  const h = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
+  return h >= 19;
+}
+function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
+function getActiveStops() {
+  return getActiveRoute().map((key, i) => ({ key, num: i + 1, ...ALL_STOPS[key] }));
+}
+
+// ── Shuttle tracking state ──
+const lastNearestKey = {};
+const shuttleDirection = {};
+const dwellTracker = {}; // shuttleId -> { stopKey, count }
+const shuttleStatus = {}; // shuttleId -> { status: 'at_stop'|'en_route', stopKey, nearestIdx, nearestKey, nearestDist }
+const prevPositions = {}; // shuttleId -> { lat, lng, time }
+const speedHistory = {}; // shuttleId -> [speed1, speed2, ...] in km/h
+const observedSegments = {}; // "stopA>stopB" -> [minutes, ...] observed travel times
+const segmentEntry = {}; // shuttleId -> { fromKey, enteredAt } for recording segment times
+
+function updateShuttleTracking(shuttleId, lat, lng) {
+  const route = getActiveRoute();
+  const stops = getActiveStops();
+  const now = Date.now();
+
+  // ── Calculate instant speed from previous position ──
+  const prev = prevPositions[shuttleId];
+  if (prev) {
+    const dtHours = (now - prev.time) / 3600000;
+    const dist = haversine(prev.lat, prev.lng, lat, lng);
+    if (dtHours > 0) {
+      const instantSpeed = dist / dtHours; // km/h
+      if (instantSpeed < 120) { // filter GPS glitches
+        if (!speedHistory[shuttleId]) speedHistory[shuttleId] = [];
+        speedHistory[shuttleId].push(instantSpeed);
+        if (speedHistory[shuttleId].length > SPEED_HISTORY_SIZE) speedHistory[shuttleId].shift();
+      }
+    }
+  }
+  prevPositions[shuttleId] = { lat, lng, time: now };
+
+  // ── Find nearest stop ──
+  let minDist = Infinity, nearestIdx = 0;
+  stops.forEach((s, i) => {
+    const d = haversine(lat, lng, s.lat, s.lng);
+    if (d < minDist) { minDist = d; nearestIdx = i; }
+  });
+  const nearestKey = route[nearestIdx];
+
+  // ── Dwell detection ──
+  if (!dwellTracker[shuttleId]) dwellTracker[shuttleId] = { stopKey: null, count: 0 };
+  const dwell = dwellTracker[shuttleId];
+  if (minDist <= DWELL_RADIUS_KM && nearestKey === dwell.stopKey) {
+    dwell.count++;
+  } else if (minDist <= DWELL_RADIUS_KM) {
+    dwell.stopKey = nearestKey;
+    dwell.count = 1;
+  } else {
+    dwell.stopKey = null;
+    dwell.count = 0;
+  }
+  const isAtStop = dwell.count >= DWELL_POLLS && minDist <= DWELL_RADIUS_KM;
+
+  // ── Record observed segment travel times ──
+  const prevKey = lastNearestKey[shuttleId];
+  if (!segmentEntry[shuttleId]) {
+    segmentEntry[shuttleId] = { fromKey: nearestKey, enteredAt: now };
+  }
+  if (prevKey && prevKey !== nearestKey) {
+    const entry = segmentEntry[shuttleId];
+    if (entry && entry.fromKey === prevKey) {
+      const segKey = `${prevKey}>${nearestKey}`;
+      const travelMin = (now - entry.enteredAt) / 60000;
+      if (travelMin > 0.5 && travelMin < 60) { // reasonable range
+        if (!observedSegments[segKey]) observedSegments[segKey] = [];
+        observedSegments[segKey].push(travelMin);
+        if (observedSegments[segKey].length > 10) observedSegments[segKey].shift();
+      }
+    }
+    segmentEntry[shuttleId] = { fromKey: nearestKey, enteredAt: now };
+  }
+
+  // ── Direction detection ──
+  if (prevKey && prevKey !== nearestKey) {
+    const prevIdx = route.indexOf(prevKey);
+    const forwardIdx = (prevIdx + 1) % route.length;
+    if (nearestIdx === forwardIdx) {
+      const nextIdx = (nearestIdx + 1) % route.length;
+      shuttleDirection[shuttleId] = { nextKey: route[nextIdx], fromIdx: nearestIdx };
+    }
+  }
+  if (!shuttleDirection[shuttleId]) {
+    const nextIdx = (nearestIdx + 1) % route.length;
+    shuttleDirection[shuttleId] = { nextKey: route[nextIdx], fromIdx: nearestIdx };
+  }
+  lastNearestKey[shuttleId] = nearestKey;
+
+  // ── Calculate ETA ──
+  const dir = shuttleDirection[shuttleId];
+  const nextStop = ALL_STOPS[dir.nextKey];
+  const distToNextRoad = haversine(lat, lng, nextStop.lat, nextStop.lng) * ROAD_FACTOR;
+
+  // Rolling average speed (exclude near-zero readings = stopped at lights etc)
+  const speeds = (speedHistory[shuttleId] || []).filter(s => s >= MIN_SPEED_KMH);
+  const avgSpeed = speeds.length >= 2 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+
+  let etaLive = null; // single value in minutes when speed data available
+  let etaMin, etaMax; // range fallback
+
+  if (avgSpeed >= MIN_SPEED_KMH) {
+    // Speed-based ETA
+    etaLive = Math.max(1, Math.round((distToNextRoad / avgSpeed) * 60));
+    etaMin = etaLive;
+    etaMax = etaLive;
+  } else {
+    // Fallback: observed segment average, then hardcoded
+    const seg = getSegmentETA(nearestKey, dir.nextKey);
+    const fromStop = stops[nearestIdx];
+    const totalSegDist = haversine(fromStop.lat, fromStop.lng, nextStop.lat, nextStop.lng);
+    const ratio = totalSegDist > 0 ? Math.min(haversine(lat, lng, nextStop.lat, nextStop.lng) / totalSegDist, 1) : 1;
+    etaMin = Math.max(1, Math.round(seg[0] * ratio));
+    etaMax = Math.max(2, Math.round(seg[1] * ratio));
+  }
+
+  shuttleStatus[shuttleId] = {
+    status: isAtStop ? 'at_stop' : 'en_route',
+    atStopKey: isAtStop ? nearestKey : null,
+    nearestIdx, nearestKey, nearestDist: minDist,
+    nextKey: dir.nextKey, nextStop,
+    etaLive, etaMin, etaMax,
+    avgSpeed: Math.round(avgSpeed),
+    nearestStop: stops[nearestIdx],
+  };
+
+  return shuttleStatus[shuttleId];
+}
+
+// ── Get best available ETA for a segment ──
+function getSegmentETA(fromKey, toKey) {
+  const segKey = `${fromKey}>${toKey}`;
+  const observed = observedSegments[segKey];
+  if (observed && observed.length >= 2) {
+    const avg = Math.round(observed.reduce((a, b) => a + b, 0) / observed.length);
+    return [avg, avg]; // observed data is a single value, not a range
+  }
+  return SEGMENT_ETA[segKey] || [15, 30];
+}
+
+// ── Get arrivals for a stop ──
+function getStopArrivals(stopKey) {
+  const route = getActiveRoute();
+  const stopIdx = route.indexOf(stopKey);
+  if (stopIdx === -1) return { here: [], arriving: [], coming: [] };
+
+  const here = [];
+  const arriving = [];
+  const coming = [];
+
+  SHUTTLES.forEach((s, i) => {
+    if (s.ada) return; // ADA shuttles run their own routes
+    const pos = positions[s.id];
+    if (!pos) return;
+    const isActive = (Date.now() - new Date(pos.timestamp).getTime()) < ACTIVE_THRESHOLD_MS;
+    if (!isActive) return;
+
+    const st = shuttleStatus[s.id];
+    if (!st) return;
+
+    const shuttleInfo = { shuttle: s, idx: i, status: st };
+
+    // At this stop
+    if (st.status === 'at_stop' && st.atStopKey === stopKey) {
+      here.push(shuttleInfo);
+      return;
+    }
+
+    // Next stop is this stop (arriving)
+    if (st.nextKey === stopKey) {
+      arriving.push({ ...shuttleInfo, etaMin: st.etaMin, etaMax: st.etaMax, etaLive: st.etaLive !== null, stopsAway: 1 });
+      return;
+    }
+
+    // Walk forward from shuttle's nearest stop to see how many stops until target
+    const shuttleIdx = st.nearestIdx;
+    for (let steps = 2; steps <= 3; steps++) {
+      const checkIdx = (shuttleIdx + steps) % route.length;
+      if (route[checkIdx] === stopKey) {
+        // First segment uses shuttle's current ETA (speed-based if available)
+        let totalMin = st.etaMin, totalMax = st.etaMax;
+        // Add remaining segments using best available data
+        for (let j = 1; j < steps; j++) {
+          const fromIdx = (shuttleIdx + j) % route.length;
+          const toIdx = (shuttleIdx + j + 1) % route.length;
+          const seg = getSegmentETA(route[fromIdx], route[toIdx]);
+          totalMin += seg[0];
+          totalMax += seg[1];
+        }
+        const hasLive = st.etaLive !== null;
+        coming.push({ ...shuttleInfo, etaMin: totalMin, etaMax: totalMax, etaLive: hasLive, stopsAway: steps });
+        return;
+      }
+    }
+  });
+
+  return { here, arriving, coming };
+}
+
+// ── State ──
+let map, shuttleMarkers = {}, positions = {}, currentFilter = 'active';
+let stopMarkers = [];
+
+// ── Mobile drawer ──
+const panel = document.getElementById('panel');
+const drawerHandle = document.getElementById('drawerHandle');
+let drawerExpanded = false;
+
+drawerHandle.addEventListener('click', () => {
+  drawerExpanded = !drawerExpanded;
+  panel.classList.toggle('expanded', drawerExpanded);
+});
+document.getElementById('map').addEventListener('click', () => {
+  if (drawerExpanded && window.innerWidth <= 640) {
+    drawerExpanded = false;
+    panel.classList.remove('expanded');
+  }
+});
+let touchStartY = 0;
+panel.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+panel.addEventListener('touchend', (e) => {
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy > 60 && drawerExpanded) { drawerExpanded = false; panel.classList.remove('expanded'); }
+  else if (dy < -60 && !drawerExpanded) { drawerExpanded = true; panel.classList.add('expanded'); }
+}, { passive: true });
+
+// ── Init map ──
+mapboxgl.accessToken = MAPBOX_TOKEN;
+map = new mapboxgl.Map({
+  container: 'map', style: 'mapbox://styles/mapbox/dark-v11',
+  center: [-97.744, 30.263], zoom: 14, attributionControl: false
+});
+map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+// ── Tab switching ──
+function switchTab(tab) {
+  const tabs = ['shuttles', 'ada', 'stops'];
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  tabs.forEach(t => document.getElementById('tab-' + t).classList.toggle('active', t === tab));
+  if (tab === 'ada') updateAdaPanel();
+  if (tab === 'stops') updateStopArrivals();
+}
+
+// ── Render stop markers on map ──
+let lastRouteMode = null;
+function renderStops() {
+  const night = isNightMode();
+  const modeKey = night ? 'night' : 'day';
+  if (modeKey === lastRouteMode) return;
+  lastRouteMode = modeKey;
+
+  const badge = document.getElementById('routeBadge');
+  if (night) { badge.className = 'route-badge night'; badge.textContent = 'Green Route + East Austin (7PM-2:30AM)'; }
+  else { badge.className = 'route-badge day'; badge.textContent = 'Orange Route (Daytime)'; }
+
+  stopMarkers.forEach(m => m.remove());
+  stopMarkers = [];
+
+  getActiveStops().forEach(stop => {
+    const el = document.createElement('div');
+    const isNight = stop.nightOnly;
+    el.style.cssText = `
+      width: 24px; height: 24px; border-radius: 6px;
+      background: ${isNight ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.25)'};
+      border: 2px solid ${isNight ? 'rgba(34,197,94,0.7)' : 'rgba(99,102,241,0.7)'};
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800;
+      color: ${isNight ? '#86efac' : '#a5b4fc'};
+      cursor: pointer; backdrop-filter: blur(4px);
+    `;
+    el.textContent = stop.num;
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([stop.lng, stop.lat]).addTo(map);
+    el.addEventListener('click', () => showStopPopup(stop));
+    stopMarkers.push(marker);
+  });
+}
+
+// ── Shuttle markers ──
+SHUTTLES.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width: 32px; height: 32px; border-radius: 50%;
+    background: ${SHUTTLE_COLORS[i]}; border: 2.5px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    cursor: pointer; transition: transform 0.3s ease; z-index: 5;
+  `;
+  el.textContent = s.num;
+  const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([-97.745, 30.267]).addTo(map);
+  el.addEventListener('click', () => showShuttlePopup(s, i));
+  shuttleMarkers[s.id] = { marker, el, color: SHUTTLE_COLORS[i] };
+});
+
+function showShuttlePopup(shuttle, idx) {
+  const pos = positions[shuttle.id];
+  if (!pos) return;
+  const age = timeAgo(pos.timestamp);
+  const isActive = (Date.now() - new Date(pos.timestamp).getTime()) < ACTIVE_THRESHOLD_MS;
+  const st = shuttleStatus[shuttle.id];
+
+  let statusText = 'Unknown';
+  if (st) {
+    if (st.status === 'at_stop') statusText = `At ${ALL_STOPS[st.atStopKey].name}`;
+    else statusText = isActive ? 'En route' : 'Parked / Inactive';
+  }
+
+  new mapboxgl.Popup({ offset: 20, closeButton: true })
+    .setLngLat([pos.lng, pos.lat])
+    .setHTML(`
+      <div class="popup-title" style="color:${SHUTTLE_COLORS[idx]}">${shuttle.name}${shuttle.ada ? ' <span style="color:#60a5fa;font-size:11px">ADA</span>' : ''}</div>
+      <div class="popup-row">Status: <span>${statusText}</span></div>
+      ${st ? `<div class="popup-row">Near: <span>${st.nearestStop.name}</span></div>
+      <div class="popup-row">Next stop: <span>${st.nextStop.name}</span></div>
+      <div class="popup-row">ETA: <span>${st.etaLive !== null ? `~${st.etaLive} min` : `${st.etaMin}-${st.etaMax} min`}</span></div>
+      ${st.avgSpeed > 0 ? `<div class="popup-row">Speed: <span>~${st.avgSpeed} km/h</span></div>` : ''}` : ''}
+      <div class="popup-row">Updated: <span>${age}</span></div>
+    `).addTo(map);
+}
+
+function showStopPopup(stop) {
+  map.flyTo({ center: [stop.lng, stop.lat], zoom: 16, duration: 800 });
+  const arrivals = getStopArrivals(stop.key);
+  const hereHtml = arrivals.here.map(a =>
+    `<div class="popup-row" style="color:#22c55e">${a.shuttle.name} - Here now</div>`
+  ).join('');
+  const arrivingHtml = arrivals.arriving.map(a =>
+    `<div class="popup-row" style="color:#f97316">${a.shuttle.name} - ${a.etaLive ? `~${a.etaMin} min` : `${a.etaMin}-${a.etaMax} min`}</div>`
+  ).join('');
+  const comingHtml = arrivals.coming.map(a =>
+    `<div class="popup-row">${a.shuttle.name} - ${a.etaLive ? `~${a.etaMin} min` : `~${a.etaMin}-${a.etaMax} min`} (${a.stopsAway} stops away)</div>`
+  ).join('');
+
+  new mapboxgl.Popup({ offset: 16, closeButton: true })
+    .setLngLat([stop.lng, stop.lat])
+    .setHTML(`
+      <div class="popup-title" style="color:${stop.nightOnly ? '#86efac' : '#a5b4fc'}">Stop ${stop.num}: ${stop.name}</div>
+      ${stop.nightOnly ? '<div class="popup-row" style="color:#22c55e">Available after 7PM CST</div>' : ''}
+      ${hereHtml || arrivingHtml || comingHtml
+        ? (hereHtml + arrivingHtml + comingHtml)
+        : '<div class="popup-row">No shuttles nearby</div>'}
+    `).addTo(map);
+}
+
+// ── Stop arrivals board (Stops tab) ──
+function updateStopArrivals() {
+  const container = document.getElementById('stopArrivals');
+  container.innerHTML = '';
+  const stops = getActiveStops();
+
+  stops.forEach(stop => {
+    const arrivals = getStopArrivals(stop.key);
+    const totalIncoming = arrivals.here.length + arrivals.arriving.length + arrivals.coming.length;
+
+    const card = document.createElement('div');
+    card.className = 'stop-card';
+
+    // Summary text
+    let summary = '';
+    if (arrivals.here.length > 0) summary = `${arrivals.here.length} here now`;
+    else if (arrivals.arriving.length > 0) {
+      const a = arrivals.arriving[0];
+      summary = `Next in ${a.etaLive ? `~${a.etaMin} min` : `${a.etaMin}-${a.etaMax} min`}`;
+    }
+    else if (arrivals.coming.length > 0) {
+      const a = arrivals.coming[0];
+      summary = `Next in ${a.etaLive ? `~${a.etaMin} min` : `~${a.etaMin}-${a.etaMax} min`}`;
+    }
+    else summary = 'No shuttles nearby';
+
+    card.innerHTML = `
+      <div class="stop-card-header">
+        <div class="stop-card-number${stop.nightOnly ? ' night-only' : ''}">${stop.num}</div>
+        <div class="stop-card-info">
+          <div class="stop-card-name">${stop.name}${stop.nightOnly ? ' <span style="color:#22c55e;font-size:9px">7PM+</span>' : ''}</div>
+          <div class="stop-card-summary">${summary}</div>
+        </div>
+      </div>
+      ${totalIncoming > 0 ? '<div class="stop-card-body"></div>' : ''}
+    `;
+
+    const header = card.querySelector('.stop-card-header');
+    header.onclick = () => {
+      showStopPopup(stop);
+      if (window.innerWidth <= 640) { drawerExpanded = false; panel.classList.remove('expanded'); }
+    };
+
+    const body = card.querySelector('.stop-card-body');
+    if (body) {
+      arrivals.here.forEach(a => {
+        body.innerHTML += `
+          <div class="arrival-row">
+            <div class="arrival-dot" style="background:${SHUTTLE_COLORS[a.idx]}"></div>
+            <div class="arrival-info">${a.shuttle.name}${a.shuttle.ada ? ' <span style="color:#60a5fa">ADA</span>' : ''}</div>
+            <div class="arrival-eta here">Here</div>
+          </div>`;
+      });
+      arrivals.arriving.forEach(a => {
+        body.innerHTML += `
+          <div class="arrival-row">
+            <div class="arrival-dot" style="background:${SHUTTLE_COLORS[a.idx]}"></div>
+            <div class="arrival-info">${a.shuttle.name}${a.shuttle.ada ? ' <span style="color:#60a5fa">ADA</span>' : ''}</div>
+            <div class="arrival-eta soon">${a.etaLive ? `~${a.etaMin} min` : `${a.etaMin}-${a.etaMax} min`}</div>
+          </div>`;
+      });
+      arrivals.coming.forEach(a => {
+        body.innerHTML += `
+          <div class="arrival-row">
+            <div class="arrival-dot" style="background:${SHUTTLE_COLORS[a.idx]}; opacity:0.4"></div>
+            <div class="arrival-info" style="color:#888">${a.shuttle.name}${a.shuttle.ada ? ' <span style="color:#60a5fa">ADA</span>' : ''} (${a.stopsAway} stops)</div>
+            <div class="arrival-eta later">${a.etaLive ? `~${a.etaMin} min` : `~${a.etaMin}-${a.etaMax} min`}</div>
+          </div>`;
+      });
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ${min % 60}m ago`;
+}
+
+function buildTopics() {
+  return SHUTTLES.map(s => `${SOLUTION_ID}/+/+/+/+/${s.id}/position`);
+}
+
+async function poll() {
+  const dot = document.getElementById('statusDot');
+  dot.classList.add('polling');
+  renderStops();
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics: buildTopics() })
+    });
+    const data = await res.json();
+
+    data.forEach(item => {
+      const coords = item.properties?.coordinates;
+      if (!coords) return;
+      positions[item.id] = {
+        lat: coords.latitude, lng: coords.longitude,
+        timestamp: item.timestamp, originSourceId: item.originSourceId
+      };
+      if (shuttleMarkers[item.id]) {
+        shuttleMarkers[item.id].marker.setLngLat([coords.longitude, coords.latitude]);
+      }
+      // Update tracking for non-ADA shuttles (ADA run their own routes)
+      const shuttle = SHUTTLES.find(s => s.id === item.id);
+      const isActive = (Date.now() - new Date(item.timestamp).getTime()) < ACTIVE_THRESHOLD_MS;
+      if (isActive && shuttle && !shuttle.ada) updateShuttleTracking(item.id, coords.latitude, coords.longitude);
+    });
+
+    updatePanel();
+    updateAdaPanel();
+    updateStopArrivals();
+
+    const activeCount = data.filter(d => (Date.now() - new Date(d.timestamp).getTime()) < ACTIVE_THRESHOLD_MS).length;
+    document.getElementById('statusText').textContent = `${activeCount} active / ${data.length} total - ${new Date().toLocaleTimeString()}`;
+    document.getElementById('drawerStatus').textContent = `${activeCount} live`;
+  } catch (err) {
+    document.getElementById('statusText').textContent = `Error: ${err.message}`;
+    document.getElementById('drawerStatus').textContent = 'Error';
+  }
+  setTimeout(() => dot.classList.remove('polling'), 500);
+}
+
+function updatePanel() {
+  const list = document.getElementById('shuttleList');
+  list.innerHTML = '';
+
+  SHUTTLES.forEach((s, i) => {
+    const pos = positions[s.id];
+    const isActive = pos && (Date.now() - new Date(pos.timestamp).getTime()) < ACTIVE_THRESHOLD_MS;
+
+    if (s.ada) {
+      shuttleMarkers[s.id].el.style.display = isActive ? 'flex' : 'none';
+      return;
+    }
+
+    if (currentFilter === 'active' && !isActive) {
+      shuttleMarkers[s.id].el.style.display = 'none';
+      return;
+    } else {
+      shuttleMarkers[s.id].el.style.display = 'flex';
+    }
+
+    const st = shuttleStatus[s.id];
+    const div = document.createElement('div');
+    div.className = `shuttle-item${isActive ? '' : ' inactive'}`;
+    div.onclick = () => {
+      if (pos) {
+        map.flyTo({ center: [pos.lng, pos.lat], zoom: 16, duration: 800 });
+        showShuttlePopup(s, i);
+        if (window.innerWidth <= 640) { drawerExpanded = false; panel.classList.remove('expanded'); }
+      }
+    };
+
+    let statusLine = 'No data';
+    if (st) {
+      if (st.status === 'at_stop') statusLine = `At ${ALL_STOPS[st.atStopKey].name}`;
+      else statusLine = `Near ${st.nearestStop.name}`;
+    }
+
+    div.innerHTML = `
+      <div class="shuttle-badge" style="background:${SHUTTLE_COLORS[i]}">${s.num}</div>
+      <div class="shuttle-info">
+        <div class="shuttle-name">${s.name}</div>
+        <div class="shuttle-meta">${statusLine}${pos ? ' - ' + timeAgo(pos.timestamp) : ''}</div>
+        ${st && isActive && st.status !== 'at_stop' ? `<div class="shuttle-eta">Next: ${st.nextStop.name} (${st.etaLive !== null ? `~${st.etaLive} min` : `${st.etaMin}-${st.etaMax} min`})</div>` : ''}
+      </div>
+      ${isActive
+        ? (st && st.status === 'at_stop'
+          ? '<span class="shuttle-active-tag">AT STOP</span>'
+          : '<span class="shuttle-active-tag">LIVE</span>')
+        : '<span class="shuttle-inactive-tag">IDLE</span>'}
+    `;
+    list.appendChild(div);
+  });
+}
+
+function updateAdaPanel() {
+  const list = document.getElementById('adaList');
+  list.innerHTML = '';
+
+  SHUTTLES.filter(s => s.ada).forEach(s => {
+    const i = SHUTTLES.indexOf(s);
+    const pos = positions[s.id];
+    const isActive = pos && (Date.now() - new Date(pos.timestamp).getTime()) < ACTIVE_THRESHOLD_MS;
+    const st = shuttleStatus[s.id];
+
+    const div = document.createElement('div');
+    div.className = `shuttle-item${isActive ? '' : ' inactive'}`;
+    div.onclick = () => {
+      if (pos) {
+        map.flyTo({ center: [pos.lng, pos.lat], zoom: 16, duration: 800 });
+        showShuttlePopup(s, i);
+        if (window.innerWidth <= 640) { drawerExpanded = false; panel.classList.remove('expanded'); }
+      }
+    };
+
+    let statusLine = 'No data';
+    if (st) {
+      if (st.status === 'at_stop') statusLine = `At ${ALL_STOPS[st.atStopKey].name}`;
+      else statusLine = `Near ${st.nearestStop.name}`;
+    }
+
+    div.innerHTML = `
+      <div class="shuttle-badge" style="background:${SHUTTLE_COLORS[i]}">${s.num}</div>
+      <div class="shuttle-info">
+        <div class="shuttle-name">${s.name} <span style="font-size:10px;color:#60a5fa">ADA</span></div>
+        <div class="shuttle-meta">${statusLine}${pos ? ' - ' + timeAgo(pos.timestamp) : ''}</div>
+        ${st && isActive && st.status !== 'at_stop' ? `<div class="shuttle-eta">Next: ${st.nextStop.name} (${st.etaMin}-${st.etaMax} min)</div>` : ''}
+      </div>
+      ${isActive
+        ? (st && st.status === 'at_stop'
+          ? '<span class="shuttle-active-tag">AT STOP</span>'
+          : '<span class="shuttle-active-tag">LIVE</span>')
+        : '<span class="shuttle-inactive-tag">IDLE</span>'}
+    `;
+    list.appendChild(div);
+  });
+}
+
+function filterShuttles(filter) {
+  currentFilter = filter;
+  document.getElementById('btnAll').classList.toggle('active', filter === 'all');
+  document.getElementById('btnActive').classList.toggle('active', filter === 'active');
+  updatePanel();
+}
+
+function fitAll() {
+  const bounds = new mapboxgl.LngLatBounds();
+  getActiveStops().forEach(s => bounds.extend([s.lng, s.lat]));
+  Object.values(positions).forEach(p => bounds.extend([p.lng, p.lat]));
+  map.fitBounds(bounds, { padding: 80, duration: 800 });
+}
+
+// ── Boot ──
+map.on('load', () => {
+  renderStops();
+  poll();
+  setInterval(poll, POLL_INTERVAL);
+});
+</script>
+</body>
+</html>
