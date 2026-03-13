@@ -406,7 +406,11 @@ const MIN_SPEED_KMH = 3; // below this, consider shuttle stopped
 // ── Supabase (driver monitoring) ──
 const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb = null;
+function getSb() {
+  if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return sb;
+}
 
 // ── Shuttle vehicles ──
 const SHUTTLES = [
@@ -1372,88 +1376,93 @@ function startWalking() {
 // ── Static route traces from official SXSW shuttle map PDF ──
 // Coordinates [lng, lat] traced at every turn along the actual streets
 const DAY_ROUTE_GEO = [
-  // 3RD & CONGRESS → N on Congress Ave
-  [-97.74374, 30.26505],
-  [-97.74370, 30.26600],
-  [-97.74365, 30.26700],
-  [-97.74360, 30.26800],
-  [-97.74355, 30.26900],
-  // PARAMOUNT / F&TV CLUBHOUSE area → continue N on Congress
-  [-97.74350, 30.26992],
-  [-97.74345, 30.27050],
-  // Turn E on ~8th/9th St
-  [-97.74200, 30.27060],
-  [-97.74000, 30.27070],
-  [-97.73800, 30.27080],
-  // DOWNRIGHT / MUSIC CLUBHOUSE (Red River & ~8th)
-  [-97.73568, 30.27114],
-  // S on Red River / Sabine
-  [-97.73560, 30.27000],
-  [-97.73555, 30.26850],
-  [-97.73550, 30.26700],
-  [-97.73545, 30.26550],
-  // Turn W on ~3rd/4th St
-  [-97.73700, 30.26540],
-  [-97.73900, 30.26530],
-  [-97.74100, 30.26530],
-  [-97.74300, 30.26540],
-  [-97.74450, 30.26550],
-  // VIOLET CROWN / ACL LIVE (W 2nd & Lavaca area)
-  [-97.74597, 30.26576],
-  // SW on W Cesar Chavez → Barton Springs Rd
-  [-97.74700, 30.26500],
-  [-97.74850, 30.26380],
-  [-97.75000, 30.26250],
-  [-97.75150, 30.26130],
-  // PALMER CIRCLE DRIVE
-  [-97.75345, 30.26017],
-  // NW toward Zach Theatre on S Lamar
-  [-97.75500, 30.26100],
-  [-97.75650, 30.26250],
-  [-97.75750, 30.26400],
-  // ZACH THEATRE
-  [-97.75797, 30.26492],
-  // S on S Lamar Blvd
-  [-97.75850, 30.26400],
-  [-97.75950, 30.26200],
-  [-97.76050, 30.26000],
-  [-97.76100, 30.25800],
-  // ALAMO LAMAR
-  [-97.76151, 30.25628],
-  // E toward Rollins (Barton Springs Rd / Toomey)
-  [-97.76000, 30.25650],
-  [-97.75800, 30.25700],
-  [-97.75600, 30.25800],
-  // ROLLINS THEATRE (Long Center area)
-  [-97.75392, 30.25964],
-  // E on Riverside / Barton Springs toward S 1st
-  [-97.75200, 30.25970],
-  [-97.75000, 30.25975],
-  [-97.74800, 30.25977],
-  // RIVIAN (S 1st area)
-  [-97.74622, 30.25977],
-  // S on S 1st toward Riverside
-  [-97.74620, 30.25850],
-  [-97.74615, 30.25700],
-  [-97.74610, 30.25550],
-  // Turn W on Riverside Dr
-  [-97.74700, 30.25450],
-  [-97.74800, 30.25350],
-  // S on S Congress past Riverside
-  [-97.74880, 30.25250],
-  [-97.74900, 30.25150],
-  // CONTINENTAL CLUB / SOCO
-  [-97.74922, 30.25044],
-  // N on S Congress Ave back to start
-  [-97.74920, 30.25150],
-  [-97.74900, 30.25350],
-  [-97.74880, 30.25550],
-  [-97.74700, 30.25700],
-  [-97.74600, 30.25900],
-  [-97.74500, 30.26100],
-  [-97.74420, 30.26300],
+  // 3RD & CONGRESS → N on Congress
+  [-97.74468, 30.26299],
+  [-97.74278, 30.26807],
+  [-97.74236, 30.26902],
+  [-97.74105, 30.26864],
+  [-97.74076, 30.26956],
+  // PARAMOUNT → E toward Downright
+  [-97.74455, 30.27060],
+  [-97.74351, 30.27330],
+  [-97.73326, 30.27055],
+  [-97.73363, 30.26962],
+  [-97.74491, 30.27280],
+  // DOWNRIGHT → W toward Violet Crown
+  [-97.74665, 30.26808],
+  [-97.74732, 30.26624],
+  [-97.74385, 30.26527],
+  // VIOLET CROWN → S toward Palmer
+  [-97.74620, 30.25889],
+  [-97.74677, 30.25907],
+  [-97.74981, 30.25843],
+  [-97.75335, 30.25953],
+  [-97.75468, 30.25999],
+  [-97.75454, 30.26022],
+  [-97.75409, 30.26024],
+  // PALMER circle loop
+  [-97.75384, 30.25992],
+  [-97.75336, 30.25974],
+  [-97.75333, 30.25994],
+  [-97.75354, 30.26017],
+  [-97.75379, 30.26033],
+  [-97.75411, 30.26022],
+  [-97.75440, 30.26024],
+  [-97.75467, 30.26004],
+  [-97.75571, 30.26035],
+  // → toward Zach
+  [-97.75678, 30.26057],
+  [-97.75811, 30.26079],
+  [-97.75831, 30.26120],
+  [-97.75795, 30.26213],
+  [-97.75706, 30.26445],
+  [-97.75766, 30.26471],
+  // ZACH THEATRE loop
+  [-97.75826, 30.26518],
+  [-97.75914, 30.26562],
+  [-97.75922, 30.26544],
+  [-97.75890, 30.26526],
+  [-97.75877, 30.26544],
+  [-97.75814, 30.26512],
+  [-97.75772, 30.26475],
+  [-97.75707, 30.26444],
+  // → S toward Alamo
+  [-97.75842, 30.26132],
+  [-97.75903, 30.25921],
+  [-97.75928, 30.25844],
+  [-97.76030, 30.25741],
+  [-97.76094, 30.25690],
+  [-97.76188, 30.25537],
+  // ALAMO LAMAR loop
+  [-97.76315, 30.25597],
+  [-97.76270, 30.25668],
+  [-97.76146, 30.25601],
+  [-97.76080, 30.25699],
+  [-97.75963, 30.25799],
+  [-97.75899, 30.25910],
+  [-97.75854, 30.26085],
+  // → E toward Rollins
+  [-97.75544, 30.26017],
+  [-97.75251, 30.25919],
+  [-97.75012, 30.25840],
+  [-97.74850, 30.25861],
+  // RIVIAN area
+  [-97.74677, 30.25902],
+  [-97.74621, 30.25882],
+  // → S toward Continental
+  [-97.74902, 30.25130],
+  [-97.74909, 30.25109],
+  [-97.75060, 30.25156],
+  // CONTINENTAL CLUB / SOCO loop
+  [-97.75131, 30.25054],
+  [-97.74948, 30.25000],
+  [-97.74815, 30.25357],
+  // → N back to Congress
+  [-97.74642, 30.25836],
+  [-97.74470, 30.26286],
+  [-97.74472, 30.26282],
   // 3RD & CONGRESS (close loop)
-  [-97.74374, 30.26505],
+  [-97.74466, 30.26302],
 ];
 
 // Night route: same as day but adds East Austin extension between Downright and Violet Crown
@@ -1610,18 +1619,20 @@ function queueEvent(evt) {
 
 async function flushEvents() {
   flushTimer = null;
-  if (eventQueue.length === 0) return;
+  const client = getSb();
+  if (!client || eventQueue.length === 0) return;
   const batch = eventQueue.splice(0);
-  try { await sb.from('sxsw_stop_events').insert(batch); }
+  try { await client.from('sxsw_stop_events').insert(batch); }
   catch (e) { console.error('Monitor flush error:', e); }
 }
 
 async function saveLapSummary(shuttle, state) {
-  if (!state.lapId || state.lapStops.size === 0) return;
+  const client = getSb();
+  if (!client || !state.lapId || state.lapStops.size === 0) return;
   const route = getActiveRoute();
   const visited = state.lapStops.size;
   try {
-    await sb.from('sxsw_lap_summaries').upsert({
+    await client.from('sxsw_lap_summaries').upsert({
       lap_id: state.lapId,
       shuttle_id: shuttle.id,
       shuttle_name: shuttle.name,
