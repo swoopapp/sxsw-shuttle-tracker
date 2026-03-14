@@ -1409,6 +1409,16 @@ const ORANGE_ROUTE_GEOJSON = {
   ]
 };
 
+// Hardcoded green (night) route GeoJSON – exact path traced from the official map
+const GREEN_ROUTE_GEOJSON = {
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{},"geometry":{"coordinates":[[-97.73359780041197,30.270672173834498],[-97.72445350179582,30.267439044605197],[-97.72651947452414,30.263037667988996],[-97.7341711667243,30.265678459040657],[-97.73248458101777,30.270303236258883]],"type":"LineString"}},
+    {"type":"Feature","properties":{},"geometry":{"coordinates":[[-97.73246375360729,30.270284044590994],[-97.74076996813851,30.27268279675576]],"type":"LineString"}},
+    {"type":"Feature","properties":{},"geometry":{"coordinates":[[-97.74076155204929,30.272684746539923],[-97.74450121707756,30.273714606033423],[-97.74496188872007,30.272559055821773]],"type":"LineString"}}
+  ]
+};
+
 async function fetchRouteGeo(route) {
   const coords = [...route, route[0]].map(key => {
     const s = ALL_STOPS[key];
@@ -1435,13 +1445,8 @@ async function renderRouteLines() {
       // Use hardcoded orange route GeoJSON
       geojson = ORANGE_ROUTE_GEOJSON;
     } else {
-      // Fetch night route from Directions API
-      if (!routeCache[routeKey]) {
-        routeCache[routeKey] = await fetchRouteGeo(route);
-      }
-      const geometry = routeCache[routeKey];
-      if (!geometry) return;
-      geojson = { type: 'Feature', geometry };
+      // Use hardcoded green route GeoJSON
+      geojson = GREEN_ROUTE_GEOJSON;
     }
 
     if (map.getSource('route')) {
