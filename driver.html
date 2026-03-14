@@ -19,6 +19,37 @@
 
   #map { width: 100%; height: 100%; }
 
+  /* ── Shuttle picker overlay ── */
+  .picker-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.95); backdrop-filter: blur(12px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .picker-overlay.hidden { display: none; }
+  .picker-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+  .picker-sub { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .picker-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    width: 100%; max-width: 340px;
+  }
+  .picker-btn {
+    padding: 18px 10px; border: 2px solid #333; border-radius: 14px;
+    background: #1a1a1a; color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; text-align: center; transition: all 0.15s;
+  }
+  .picker-btn:active { transform: scale(0.96); }
+  .picker-btn:hover { border-color: #555; background: #222; }
+  .picker-btn .num { font-size: 24px; display: block; margin-bottom: 4px; }
+  .picker-btn .label { font-size: 10px; color: #666; }
+  .picker-change {
+    position: absolute; top: 12px; right: 16px; z-index: 101;
+    padding: 6px 12px; border-radius: 8px; border: 1px solid #333;
+    background: rgba(20,20,20,0.9); backdrop-filter: blur(8px);
+    color: #888; font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+  .picker-change:active { background: #222; }
+
   /* ── Top status bar ── */
   .top-bar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 10;
@@ -39,7 +70,7 @@
   .top-pill .dot.green { background: #22c55e; }
   .top-pill .dot.orange { background: #f97316; }
   .top-pill .dot.red { background: #ef4444; }
-  .gps-accuracy { font-size: 10px; color: #666; }
+  .gps-label { font-size: 10px; color: #666; }
   .lap-pill { font-size: 11px; color: #888; padding: 6px 10px; border-radius: 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
 
   /* ── Bottom panel ── */
@@ -65,9 +96,7 @@
   }
   .next-meta strong { color: #a5b4fc; }
 
-  .stop-progress {
-    display: flex; gap: 4px; margin-top: 12px;
-  }
+  .stop-progress { display: flex; gap: 4px; margin-top: 12px; }
   .stop-pip {
     flex: 1; height: 4px; border-radius: 2px; background: #333;
     transition: background 0.3s;
@@ -94,29 +123,26 @@
   }
   .btn-secondary:active { background: #222; }
 
-  /* ── Approaching alert ── */
+  /* ── Alerts ── */
   .approach-alert {
     display: none; padding: 10px 16px; margin-bottom: 8px;
     border-radius: 12px; background: rgba(99,102,241,0.15);
     border: 1px solid rgba(99,102,241,0.3);
-    font-size: 13px; font-weight: 600; color: #a5b4fc;
-    text-align: center;
+    font-size: 13px; font-weight: 600; color: #a5b4fc; text-align: center;
   }
   .approach-alert.show { display: block; animation: slideUp 0.3s ease; }
   .approach-alert.arrived { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: #22c55e; }
   @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* ── Missed stop warning ── */
   .missed-alert {
     display: none; padding: 10px 16px; margin-bottom: 8px;
     border-radius: 12px; background: rgba(239,68,68,0.15);
     border: 1px solid rgba(239,68,68,0.3);
-    font-size: 13px; font-weight: 600; color: #ef4444;
-    text-align: center;
+    font-size: 13px; font-weight: 600; color: #ef4444; text-align: center;
   }
   .missed-alert.show { display: block; animation: slideUp 0.3s ease; }
 
-  /* ── Recenter button ── */
+  /* ── Recenter / status ── */
   .recenter-btn {
     position: absolute; bottom: 220px; right: 16px; z-index: 10;
     width: 44px; height: 44px; border-radius: 50%;
@@ -128,37 +154,31 @@
   .recenter-btn:active { background: #222; }
   .recenter-btn.tracking { color: #60a5fa; border-color: rgba(59,130,246,0.3); }
 
-  /* ── GPS status ── */
   .gps-status {
     position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 10;
     padding: 8px 16px; border-radius: 20px;
     background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
     border: 1px solid rgba(255,255,255,0.1);
-    font-size: 12px; color: #888;
-    display: none;
+    font-size: 12px; color: #888; display: none;
   }
   .gps-status.show { display: block; }
 
-  /* Stop markers */
+  /* ── Map markers ── */
   .stop-marker {
     width: 32px; height: 32px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 800; color: #fff;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-    cursor: pointer;
-    transition: all 0.3s;
+    border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    cursor: pointer; transition: all 0.3s;
   }
   .stop-marker.visited { opacity: 0.4; transform: scale(0.8); }
   .stop-marker.next-stop {
     width: 40px; height: 40px; font-size: 15px;
-    border-color: #22c55e;
-    box-shadow: 0 0 16px rgba(34,197,94,0.4);
+    border-color: #22c55e; box-shadow: 0 0 16px rgba(34,197,94,0.4);
     animation: markerPulse 2s ease-in-out infinite;
   }
   @keyframes markerPulse { 0%,100% { box-shadow: 0 0 8px rgba(34,197,94,0.3); } 50% { box-shadow: 0 0 20px rgba(34,197,94,0.6); } }
 
-  /* Driver dot */
   .driver-dot {
     width: 20px; height: 20px; border-radius: 50%;
     background: #4285f4; border: 3px solid #fff;
@@ -175,20 +195,32 @@
 </head>
 <body>
 
+<!-- Shuttle Picker -->
+<div class="picker-overlay" id="pickerOverlay">
+  <div class="picker-title">Select Your Shuttle</div>
+  <div class="picker-sub">Tap the shuttle number you're driving</div>
+  <div class="picker-grid" id="pickerGrid"></div>
+</div>
+
 <div id="map"></div>
+
+<!-- Change shuttle button (visible after selection) -->
+<button class="picker-change" id="changeShuttle" style="display:none" onclick="showPicker()">Change Shuttle</button>
 
 <div class="top-bar">
   <div class="top-pill">
     <div class="dot green" id="gpsDot"></div>
+    <span id="shuttleLabel">—</span>
+    <span style="color:#555">|</span>
     <span id="routeLabel">Day Route</span>
     <span style="color:#555">|</span>
     <span id="stopLabel">Stop 1/11</span>
-    <span class="gps-accuracy" id="gpsAccuracy"></span>
+    <span class="gps-label" id="gpsLabel"></span>
   </div>
   <div class="lap-pill" id="lapLabel">Lap 1</div>
 </div>
 
-<div class="gps-status" id="gpsStatus">Acquiring GPS signal...</div>
+<div class="gps-status" id="gpsStatus"></div>
 
 <button class="recenter-btn" id="recenterBtn" onclick="recenter()">◎</button>
 
@@ -197,7 +229,7 @@
   <div class="missed-alert" id="missedAlert"></div>
   <div class="next-stop-card">
     <div class="next-label" id="nextLabel">Next Stop</div>
-    <div class="next-name" id="nextName">Loading...</div>
+    <div class="next-name" id="nextName">Select shuttle to start</div>
     <div class="next-venues" id="nextVenues"></div>
     <div class="next-meta" id="nextMeta"></div>
     <div class="stop-progress" id="stopProgress"></div>
@@ -216,38 +248,31 @@ const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ── Session ID (anonymous, persisted per device) ──
-function getSessionId() {
-  let id = localStorage.getItem('driverSessionId');
-  if (!id) {
-    id = 'drv_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    localStorage.setItem('driverSessionId', id);
-  }
-  return id;
-}
-const SESSION_ID = getSessionId();
+// ── Vehicle GPS API (same as main tracker) ──
+const SOLUTION_ID = '6b2dab7ddae2420da0b707dd';
+const API_URL = 'https://liveapi.mapsindoors.com/api/state';
+const POLL_INTERVAL = 5000; // 5s for driver — faster than tracker's 8s
 
-async function logStatus() {
-  const route = getActiveRoute();
-  const stopKey = route[currentIdx];
-  const stop = ALL_STOPS[stopKey];
-  try {
-    await sb.from('sxsw_driver_app_status').upsert({
-      session_id: SESSION_ID,
-      current_stop_idx: currentIdx,
-      current_stop_key: stopKey,
-      current_stop_name: stop.name,
-      lap_count: lapCount,
-      route_type: isNightMode() ? 'night' : 'day',
-      last_lat: driverLat,
-      last_lng: driverLng,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'session_id' });
-  } catch (e) { /* silent */ }
-}
+// ── Shuttle list ──
+const SHUTTLES = [
+  { id: 'e9525829c53340b4b6bcf62e', name: 'Shuttle 1',  num: 1, ada: true },
+  { id: '3fbe7b87b2514cf88dd2959b', name: 'Shuttle 2',  num: 2, ada: true },
+  { id: 'a8e138aab9c74a1e9afcb051', name: 'Shuttle 3',  num: 3 },
+  { id: '966d0e5cbe024e9a94afb345', name: 'Shuttle 4',  num: 4 },
+  { id: '6638cfc9240f4b41a8273f41', name: 'Shuttle 5',  num: 5 },
+  { id: '99b7d83570cc4d7ba234b653', name: 'Shuttle 6',  num: 6 },
+  { id: '7339ecf0f94949a9a5c0fb6e', name: 'Shuttle 7',  num: 7 },
+  { id: '9e50f5c2ad2c47498f6e30cb', name: 'Shuttle 8',  num: 8 },
+  { id: 'ed0bf01640f54f31870f08cd', name: 'Shuttle 9',  num: 9 },
+  { id: '75c77ccb07274878ac13be62', name: 'Shuttle 10', num: 10 },
+  { id: 'c0237622c71746278279628d', name: 'Shuttle 11', num: 11 },
+  { id: '42cbdeb1a351415cbd9f1dc4', name: 'Shuttle 12', num: 12 },
+];
 
-// Heartbeat every 30s
-setInterval(logStatus, 30000);
+const SHUTTLE_COLORS = [
+  '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4',
+  '#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e'
+];
 
 // ── Stop Data ──
 const ALL_STOPS = {
@@ -294,6 +319,7 @@ const DAY_ROUTE = ['congress','paramount','downright','violetcrown','w3rd','palm
 const NIGHT_ROUTE = ['congress','paramount','downright','shangrila','hotelvegas','violetcrown','palmer','zach','alamo','rollins','rivian','continental'];
 
 // ── State ──
+let selectedShuttle = null;
 let currentIdx = parseInt(localStorage.getItem('driverStopIdx') || '0');
 let lapCount = parseInt(localStorage.getItem('driverLapCount') || '1');
 let driverLat = null, driverLng = null;
@@ -301,6 +327,8 @@ let tracking = true;
 let routeLineLoaded = false;
 let stopMarkers = [];
 let driverMarker = null;
+let pollTimer = null;
+let lastGpsTime = null;
 
 function isNightMode() {
   const h = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
@@ -313,14 +341,155 @@ function save() {
   localStorage.setItem('driverLapCount', lapCount);
 }
 
+// ── Supabase logging ──
+async function logStatus() {
+  if (!selectedShuttle) return;
+  const route = getActiveRoute();
+  const stopKey = route[currentIdx];
+  const stop = ALL_STOPS[stopKey];
+  try {
+    await sb.from('sxsw_driver_app_status').upsert({
+      session_id: 'shuttle_' + selectedShuttle.num,
+      current_stop_idx: currentIdx,
+      current_stop_key: stopKey,
+      current_stop_name: stop.name,
+      lap_count: lapCount,
+      route_type: isNightMode() ? 'night' : 'day',
+      last_lat: driverLat,
+      last_lng: driverLng,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'session_id' });
+  } catch (e) { /* silent */ }
+}
+
 // ── Distance calc ──
 function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371000; // meters
+  const R = 6371000;
   const toRad = x => x * Math.PI / 180;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
   const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ── Shuttle Picker ──
+function buildPicker() {
+  const grid = document.getElementById('pickerGrid');
+  SHUTTLES.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'picker-btn';
+    const color = SHUTTLE_COLORS[(s.num - 1) % 12];
+    btn.style.borderColor = color;
+    btn.innerHTML = `<span class="num" style="color:${color}">${s.num}</span><span class="label">${s.ada ? 'ADA' : 'Standard'}</span>`;
+    btn.onclick = () => selectShuttle(s);
+    grid.appendChild(btn);
+  });
+}
+
+function selectShuttle(shuttle) {
+  selectedShuttle = shuttle;
+  localStorage.setItem('driverShuttleNum', shuttle.num);
+  document.getElementById('pickerOverlay').classList.add('hidden');
+  document.getElementById('changeShuttle').style.display = '';
+  document.getElementById('shuttleLabel').textContent = shuttle.name;
+  document.getElementById('shuttleLabel').style.color = SHUTTLE_COLORS[(shuttle.num - 1) % 12];
+  startVehicleGPS();
+  logStatus();
+}
+
+function showPicker() {
+  if (pollTimer) clearInterval(pollTimer);
+  document.getElementById('pickerOverlay').classList.remove('hidden');
+  document.getElementById('changeShuttle').style.display = 'none';
+}
+
+function restoreShuttle() {
+  const num = parseInt(localStorage.getItem('driverShuttleNum'));
+  if (num) {
+    const shuttle = SHUTTLES.find(s => s.num === num);
+    if (shuttle) { selectShuttle(shuttle); return; }
+  }
+  // Show picker
+  document.getElementById('pickerOverlay').classList.remove('hidden');
+}
+
+// ── Vehicle GPS polling (hardware tracker) ──
+function startVehicleGPS() {
+  const statusEl = document.getElementById('gpsStatus');
+  const gpsDot = document.getElementById('gpsDot');
+  const gpsLabel = document.getElementById('gpsLabel');
+
+  statusEl.textContent = 'Connecting to vehicle GPS...';
+  statusEl.classList.add('show');
+  gpsDot.className = 'dot orange';
+
+  async function pollPosition() {
+    try {
+      const topic = `${SOLUTION_ID}/+/+/+/+/${selectedShuttle.id}/position`;
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: [topic] })
+      });
+      const data = await res.json();
+
+      if (data.length > 0 && data[0].properties?.coordinates) {
+        const coords = data[0].properties.coordinates;
+        const ts = data[0].timestamp;
+        const age = Date.now() - new Date(ts).getTime();
+
+        driverLat = coords.latitude;
+        driverLng = coords.longitude;
+        lastGpsTime = ts;
+
+        // Update status
+        if (age < 30000) {
+          gpsDot.className = 'dot green';
+          gpsLabel.textContent = 'Vehicle GPS';
+          gpsLabel.style.color = '#22c55e';
+          statusEl.classList.remove('show');
+        } else if (age < 120000) {
+          gpsDot.className = 'dot orange';
+          gpsLabel.textContent = Math.round(age / 1000) + 's ago';
+          gpsLabel.style.color = '#f97316';
+          statusEl.classList.remove('show');
+        } else {
+          gpsDot.className = 'dot red';
+          gpsLabel.textContent = 'Stale';
+          gpsLabel.style.color = '#ef4444';
+          statusEl.textContent = 'Vehicle GPS signal stale — is the shuttle on?';
+          statusEl.classList.add('show');
+        }
+
+        updateDriverMarker(driverLat, driverLng);
+
+        if (tracking) {
+          map.easeTo({ center: [driverLng, driverLat], duration: 1000 });
+        }
+
+        checkProximity();
+      } else {
+        gpsDot.className = 'dot red';
+        gpsLabel.textContent = 'No signal';
+        gpsLabel.style.color = '#ef4444';
+        statusEl.textContent = 'No GPS data from vehicle — is the shuttle on?';
+        statusEl.classList.add('show');
+      }
+    } catch (err) {
+      gpsDot.className = 'dot red';
+      gpsLabel.textContent = 'Error';
+      statusEl.textContent = 'Connection error — retrying...';
+      statusEl.classList.add('show');
+    }
+  }
+
+  // Poll immediately then every 5s
+  pollPosition();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollPosition, POLL_INTERVAL);
+
+  // Log status to Supabase every 30s
+  setInterval(logStatus, 30000);
 }
 
 // ── Map setup ──
@@ -336,50 +505,34 @@ const map = new mapboxgl.Map({
 map.on('load', () => {
   loadRouteLine();
   addStopMarkers();
-  startGPS();
   updateUI();
-  logStatus();
+  buildPicker();
+  restoreShuttle();
 });
 
-// Disable tracking on user drag
 map.on('dragstart', () => { tracking = false; updateRecenterBtn(); });
 
 // ── Route line via Mapbox Directions ──
 function loadRouteLine() {
   const route = getActiveRoute();
-  // Build coordinates string: lng,lat;lng,lat;...;lng,lat (loop back to start)
   const coords = [...route, route[0]].map(key => {
     const s = ALL_STOPS[key];
     return `${s.lng},${s.lat}`;
   }).join(';');
 
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`;
-
-  fetch(url)
+  fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`)
     .then(r => r.json())
     .then(data => {
       if (!data.routes || !data.routes[0]) return;
-
       const geojson = data.routes[0].geometry;
-
       if (map.getSource('route-line')) {
         map.getSource('route-line').setData({ type: 'Feature', geometry: geojson });
       } else {
-        map.addSource('route-line', {
-          type: 'geojson',
-          data: { type: 'Feature', geometry: geojson }
-        });
-
-        // Glow
-        map.addLayer({
-          id: 'route-glow', type: 'line', source: 'route-line',
-          paint: { 'line-color': '#6366f1', 'line-width': 10, 'line-opacity': 0.15, 'line-blur': 8 }
-        });
-        // Main line
-        map.addLayer({
-          id: 'route-main', type: 'line', source: 'route-line',
-          paint: { 'line-color': '#6366f1', 'line-width': 4, 'line-opacity': 0.7 }
-        });
+        map.addSource('route-line', { type: 'geojson', data: { type: 'Feature', geometry: geojson } });
+        map.addLayer({ id: 'route-glow', type: 'line', source: 'route-line',
+          paint: { 'line-color': '#6366f1', 'line-width': 10, 'line-opacity': 0.15, 'line-blur': 8 } });
+        map.addLayer({ id: 'route-main', type: 'line', source: 'route-line',
+          paint: { 'line-color': '#6366f1', 'line-width': 4, 'line-opacity': 0.7 } });
       }
       routeLineLoaded = true;
     })
@@ -388,28 +541,21 @@ function loadRouteLine() {
 
 // ── Stop markers ──
 function addStopMarkers() {
-  // Clear existing
   stopMarkers.forEach(m => m.remove());
   stopMarkers = [];
-
   const route = getActiveRoute();
   route.forEach((key, i) => {
     const stop = ALL_STOPS[key];
     const color = STOP_COLORS[key] || '#6366f1';
-
     const el = document.createElement('div');
     el.className = 'stop-marker';
     el.id = `marker-${key}`;
     el.style.background = color;
     el.textContent = i + 1;
-
     const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-      .setLngLat([stop.lng, stop.lat])
-      .addTo(map);
-
+      .setLngLat([stop.lng, stop.lat]).addTo(map);
     stopMarkers.push(marker);
   });
-
   updateMarkerStyles();
 }
 
@@ -424,149 +570,22 @@ function updateMarkerStyles() {
   });
 }
 
-// ── Driver GPS marker + accuracy circle ──
-let accuracyCircleAdded = false;
-
-function updateDriverMarker(lat, lng, accuracy, heading) {
-  // Blue dot marker
+// ── Driver marker ──
+function updateDriverMarker(lat, lng) {
   if (!driverMarker) {
     const el = document.createElement('div');
     el.style.position = 'relative';
-    el.id = 'driverDotEl';
     el.innerHTML = '<div class="driver-dot-ping"></div><div class="driver-dot"></div>';
     driverMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-      .setLngLat([lng, lat])
-      .addTo(map);
+      .setLngLat([lng, lat]).addTo(map);
   } else {
     driverMarker.setLngLat([lng, lat]);
   }
-
-  // Heading arrow
-  if (heading !== null && heading !== undefined && !isNaN(heading)) {
-    const dot = document.querySelector('#driverDotEl .driver-dot');
-    if (dot) dot.style.transform = `rotate(${heading}deg)`;
-  }
-
-  // Accuracy circle on the map (shows GPS confidence radius)
-  if (accuracy) {
-    const circle = createGeoJSONCircle([lng, lat], accuracy);
-    if (map.getSource('accuracy-circle')) {
-      map.getSource('accuracy-circle').setData(circle);
-    } else if (map.isStyleLoaded()) {
-      map.addSource('accuracy-circle', { type: 'geojson', data: circle });
-      map.addLayer({
-        id: 'accuracy-fill', type: 'fill', source: 'accuracy-circle',
-        paint: { 'fill-color': '#4285f4', 'fill-opacity': 0.1 }
-      });
-      map.addLayer({
-        id: 'accuracy-border', type: 'line', source: 'accuracy-circle',
-        paint: { 'line-color': '#4285f4', 'line-width': 1, 'line-opacity': 0.3 }
-      });
-      accuracyCircleAdded = true;
-    }
-  }
-}
-
-// Generate a GeoJSON circle polygon (for accuracy radius)
-function createGeoJSONCircle(center, radiusMeters, points) {
-  points = points || 48;
-  const coords = [];
-  const km = radiusMeters / 1000;
-  const distanceX = km / (111.32 * Math.cos(center[1] * Math.PI / 180));
-  const distanceY = km / 110.574;
-  for (let i = 0; i < points; i++) {
-    const theta = (i / points) * (2 * Math.PI);
-    coords.push([
-      center[0] + (distanceX * Math.cos(theta)),
-      center[1] + (distanceY * Math.sin(theta))
-    ]);
-  }
-  coords.push(coords[0]);
-  return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } };
-}
-
-// ── GPS tracking ──
-let watchId = null;
-let gpsAccuracy = null;
-const MAX_ACCURACY = 150; // meters — reject readings worse than this
-
-function startGPS() {
-  const statusEl = document.getElementById('gpsStatus');
-  const gpsDot = document.getElementById('gpsDot');
-  const accEl = document.getElementById('gpsAccuracy');
-
-  if (!navigator.geolocation) {
-    statusEl.textContent = 'GPS not available on this device';
-    statusEl.classList.add('show');
-    gpsDot.className = 'dot red';
-    return;
-  }
-
-  statusEl.textContent = 'Acquiring GPS signal...';
-  statusEl.classList.add('show');
-  gpsDot.className = 'dot orange';
-
-  watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      const acc = pos.coords.accuracy; // meters
-      const heading = pos.coords.heading; // degrees or null
-      gpsAccuracy = acc;
-
-      // Show accuracy in top bar
-      if (acc <= 10) {
-        accEl.textContent = '±' + Math.round(acc) + 'm';
-        accEl.style.color = '#22c55e';
-      } else if (acc <= 30) {
-        accEl.textContent = '±' + Math.round(acc) + 'm';
-        accEl.style.color = '#eab308';
-      } else if (acc <= MAX_ACCURACY) {
-        accEl.textContent = '±' + Math.round(acc) + 'm';
-        accEl.style.color = '#f97316';
-      } else {
-        // Reading too inaccurate — show warning but don't update position
-        accEl.textContent = '±' + Math.round(acc) + 'm (weak)';
-        accEl.style.color = '#ef4444';
-        gpsDot.className = 'dot orange';
-        statusEl.textContent = 'Low GPS accuracy — move to open area';
-        statusEl.classList.add('show');
-        return; // skip this reading
-      }
-
-      driverLat = pos.coords.latitude;
-      driverLng = pos.coords.longitude;
-
-      statusEl.classList.remove('show');
-      gpsDot.className = 'dot green';
-
-      updateDriverMarker(driverLat, driverLng, acc, heading);
-
-      if (tracking) {
-        map.easeTo({ center: [driverLng, driverLat], duration: 1000 });
-      }
-
-      checkProximity();
-    },
-    (err) => {
-      statusEl.textContent = err.code === 1
-        ? 'Location access denied — please allow in browser settings'
-        : err.code === 2
-        ? 'GPS unavailable — check device settings'
-        : 'GPS timeout — trying again...';
-      statusEl.classList.add('show');
-      gpsDot.className = 'dot red';
-      accEl.textContent = '';
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 1000,   // only accept 1s old readings
-      timeout: 15000      // 15s timeout before error
-    }
-  );
 }
 
 // ── Proximity detection ──
-const ARRIVE_RADIUS = 80;  // meters — auto-detect arrival
-const APPROACH_RADIUS = 200; // meters — show approaching alert
+const ARRIVE_RADIUS = 80;
+const APPROACH_RADIUS = 200;
 let isApproaching = false;
 let hasArrivedGeo = false;
 
@@ -581,30 +600,22 @@ function checkProximity() {
   const btn = document.getElementById('btnArrived');
   const missedEl = document.getElementById('missedAlert');
 
-  // Update distance in meta
   updateDistDisplay(dist);
 
   if (dist <= ARRIVE_RADIUS) {
-    // At the stop
     if (!hasArrivedGeo) {
       hasArrivedGeo = true;
       alertEl.textContent = '📍 You\'ve arrived at ' + stop.name + '!';
       alertEl.className = 'approach-alert show arrived';
       btn.classList.add('pulse');
-      // Vibrate if available
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
   } else if (dist <= APPROACH_RADIUS) {
-    if (!isApproaching) {
-      isApproaching = true;
-      alertEl.textContent = 'Approaching ' + stop.name + ' — ' + Math.round(dist) + 'm away';
-      alertEl.className = 'approach-alert show';
-    } else {
-      alertEl.textContent = 'Approaching ' + stop.name + ' — ' + Math.round(dist) + 'm away';
-    }
+    if (!isApproaching) isApproaching = true;
+    alertEl.textContent = 'Approaching ' + stop.name + ' — ' + Math.round(dist) + 'm away';
+    alertEl.className = 'approach-alert show';
   } else {
     if (isApproaching && !hasArrivedGeo) {
-      // Driver went past without stopping
       missedEl.textContent = '⚠ You may have passed ' + stop.name + ' — please confirm';
       missedEl.className = 'missed-alert show';
     }
@@ -619,9 +630,7 @@ function updateDistDisplay(dist) {
   let distText;
   if (dist < 1000) distText = Math.round(dist) + ' m away';
   else distText = (dist / 1609.34).toFixed(1) + ' mi away';
-
   const route = getActiveRoute();
-  const stopKey = route[currentIdx];
   metaEl.innerHTML = `<span>Stop <strong>${currentIdx + 1}</strong> of ${route.length}</span><span>${distText}</span>`;
 }
 
@@ -629,14 +638,10 @@ function updateDistDisplay(dist) {
 function arrivedAtStop() {
   const route = getActiveRoute();
   currentIdx++;
-  if (currentIdx >= route.length) {
-    currentIdx = 0;
-    lapCount++;
-  }
+  if (currentIdx >= route.length) { currentIdx = 0; lapCount++; }
   save();
   logStatus();
 
-  // Reset alerts
   isApproaching = false;
   hasArrivedGeo = false;
   document.getElementById('approachAlert').className = 'approach-alert';
@@ -645,11 +650,9 @@ function arrivedAtStop() {
 
   updateUI();
 
-  // Pan to next stop
   const nextKey = route[currentIdx] || route[0];
   const nextStop = ALL_STOPS[nextKey];
   if (!tracking && driverLat !== null) {
-    // Show both driver and next stop
     const bounds = new mapboxgl.LngLatBounds();
     bounds.extend([driverLng, driverLat]);
     bounds.extend([nextStop.lng, nextStop.lat]);
@@ -660,12 +663,8 @@ function arrivedAtStop() {
 }
 
 function prevStop() {
-  if (currentIdx > 0) {
-    currentIdx--;
-  } else if (lapCount > 1) {
-    currentIdx = getActiveRoute().length - 1;
-    lapCount--;
-  }
+  if (currentIdx > 0) currentIdx--;
+  else if (lapCount > 1) { currentIdx = getActiveRoute().length - 1; lapCount--; }
   save();
   isApproaching = false;
   hasArrivedGeo = false;
@@ -678,9 +677,7 @@ function prevStop() {
 function recenter() {
   tracking = true;
   updateRecenterBtn();
-  if (driverLat !== null) {
-    map.easeTo({ center: [driverLng, driverLat], zoom: 15, duration: 500 });
-  }
+  if (driverLat !== null) map.easeTo({ center: [driverLng, driverLat], zoom: 15, duration: 500 });
 }
 
 function updateRecenterBtn() {
@@ -697,42 +694,30 @@ function updateUI() {
   const stop = ALL_STOPS[stopKey];
   const venues = STOP_VENUES[stopKey] || '';
 
-  // Top bar
   document.getElementById('routeLabel').textContent = night ? '🌙 Night' : '☀️ Day';
   document.getElementById('stopLabel').textContent = `Stop ${currentIdx + 1}/${route.length}`;
   document.getElementById('lapLabel').textContent = `Lap ${lapCount}`;
 
-  // Next stop card
   document.getElementById('nextLabel').textContent = currentIdx === 0 ? 'Starting Stop' : 'Next Stop';
   document.getElementById('nextName').textContent = stop.name;
   document.getElementById('nextVenues').textContent = venues;
 
-  // Distance
   if (driverLat !== null) {
-    const dist = haversine(driverLat, driverLng, stop.lat, stop.lng);
-    updateDistDisplay(dist);
+    updateDistDisplay(haversine(driverLat, driverLng, stop.lat, stop.lng));
   } else {
-    document.getElementById('nextMeta').innerHTML = `<span>Stop <strong>${currentIdx + 1}</strong> of ${route.length}</span><span>GPS loading...</span>`;
+    document.getElementById('nextMeta').innerHTML = `<span>Stop <strong>${currentIdx + 1}</strong> of ${route.length}</span><span>Waiting for GPS...</span>`;
   }
 
-  // Progress pips
-  const progEl = document.getElementById('stopProgress');
-  progEl.innerHTML = route.map((_, i) => {
+  document.getElementById('stopProgress').innerHTML = route.map((_, i) => {
     let cls = 'stop-pip';
     if (i < currentIdx) cls += ' done';
     else if (i === currentIdx) cls += ' current';
     return `<div class="${cls}"></div>`;
   }).join('');
 
-  // Button text
   const btn = document.getElementById('btnArrived');
-  if (currentIdx === route.length - 1) {
-    btn.textContent = 'Arrived → Complete Lap';
-  } else {
-    btn.textContent = 'Arrived → Next Stop';
-  }
+  btn.textContent = currentIdx === route.length - 1 ? 'Arrived → Complete Lap' : 'Arrived → Next Stop';
 
-  // Markers
   updateMarkerStyles();
 }
 </script>
