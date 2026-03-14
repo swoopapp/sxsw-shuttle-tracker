@@ -463,11 +463,14 @@ async function pollGPS() {
     const data = await res.json();
 
     const now = Date.now();
-    (data || []).forEach(item => {
+    const items = data || [];
+    let matched_count = 0;
+    items.forEach(item => {
       const coords = item.properties && item.properties.coordinates;
       if (!coords) return;
       const matched = SHUTTLES.find(s => s.id === item.id);
       if (!matched) return;
+      matched_count++;
       const lat = parseFloat(coords.latitude);
       const lng = parseFloat(coords.longitude);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -475,9 +478,10 @@ async function pollGPS() {
     });
 
     const activeCount = Object.values(gpsPositions).filter(p => (now - p.ts) < ACTIVE_THRESHOLD_MS).length;
-    updateSystemDot('dotGps', 'lblGps', activeCount > 0 ? 'ok' : 'warn', `GPS: ${activeCount} signals`);
+    updateSystemDot('dotGps', 'lblGps', activeCount > 0 ? 'ok' : 'warn', `GPS: ${activeCount} signals (${items.length} raw, ${matched_count} matched)`);
   } catch (e) {
-    updateSystemDot('dotGps', 'lblGps', 'err', 'GPS: connection error');
+    console.error('GPS poll error:', e);
+    updateSystemDot('dotGps', 'lblGps', 'err', `GPS: error - ${e.message}`);
   }
   renderFleetGrid();
   renderRouteCoverage();
