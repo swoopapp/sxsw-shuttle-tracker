@@ -336,14 +336,14 @@ const SHUTTLES = [
   { id: 'e9525829c53340b4b6bcf62e', name: 'Shuttle 1',  num: 1,  ada: true },
   { id: '3fbe7b87b2514cf88dd2959b', name: 'Shuttle 2',  num: 2,  ada: true },
   { id: 'a8e138aab9c74a1e9afcb051', name: 'Shuttle 3',  num: 3 },
-  { id: '2d0bb5d4adc14172b4f6b87a', name: 'Shuttle 4',  num: 4 },
-  { id: '7b8f9c1e2d3a4b5c6d7e8f9a', name: 'Shuttle 5',  num: 5 },
-  { id: 'd9c8b7a6f5e4d3c2b1a0f9e8', name: 'Shuttle 6',  num: 6 },
-  { id: '4f5g6h7i8j9k0l1m2n3o4p5q', name: 'Shuttle 7',  num: 7 },
-  { id: '9r8s7t6u5v4w3x2y1z0a9b8c', name: 'Shuttle 8',  num: 8 },
-  { id: '3d4e5f6g7h8i9j0k1l2m3n4o', name: 'Shuttle 9',  num: 9 },
-  { id: '5p6q7r8s9t0u1v2w3x4y5z6a', name: 'Shuttle 10', num: 10 },
-  { id: '7b8c9d0e1f2g3h4i5j6k7l8m', name: 'Shuttle 11', num: 11 }
+  { id: '966d0e5cbe024e9a94afb345', name: 'Shuttle 4',  num: 4 },
+  { id: '6638cfc9240f4b41a8273f41', name: 'Shuttle 5',  num: 5 },
+  { id: '99b7d83570cc4d7ba234b653', name: 'Shuttle 6',  num: 6 },
+  { id: '7339ecf0f94949a9a5c0fb6e', name: 'Shuttle 7',  num: 7 },
+  { id: '9e50f5c2ad2c47498f6e30cb', name: 'Shuttle 8',  num: 8 },
+  { id: 'ed0bf01640f54f31870f08cd', name: 'Shuttle 9',  num: 9 },
+  { id: '75c77ccb07274878ac13be62', name: 'Shuttle 10', num: 10 },
+  { id: 'c0237622c71746278279628d', name: 'Shuttle 11', num: 11 }
 ];
 
 const ALL_STOPS = {
@@ -530,10 +530,13 @@ function renderFleetGrid() {
   const grid = document.getElementById('fleetGrid');
 
   // Build driver lookup: shuttleNum -> status
+  // Driver app writes session_id like "shuttle_3", extract num from that
   const driverByNum = {};
   driverStatuses.forEach(d => {
-    if (!driverByNum[d.shuttle_num] || new Date(d.updated_at) > new Date(driverByNum[d.shuttle_num].updated_at)) {
-      driverByNum[d.shuttle_num] = d;
+    const num = d.shuttle_num || (d.session_id && d.session_id.startsWith('shuttle_') ? parseInt(d.session_id.split('_')[1]) : null);
+    if (!num) return;
+    if (!driverByNum[num] || new Date(d.updated_at) > new Date(driverByNum[num].updated_at)) {
+      driverByNum[num] = d;
     }
   });
 
