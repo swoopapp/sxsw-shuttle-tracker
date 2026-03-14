@@ -39,6 +39,7 @@
   .top-pill .dot.green { background: #22c55e; }
   .top-pill .dot.orange { background: #f97316; }
   .top-pill .dot.red { background: #ef4444; }
+  .gps-accuracy { font-size: 10px; color: #666; }
   .lap-pill { font-size: 11px; color: #888; padding: 6px 10px; border-radius: 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
 
   /* ── Bottom panel ── */
@@ -182,6 +183,7 @@
     <span id="routeLabel">Day Route</span>
     <span style="color:#555">|</span>
     <span id="stopLabel">Stop 1/11</span>
+    <span class="gps-accuracy" id="gpsAccuracy"></span>
   </div>
   <div class="lap-pill" id="lapLabel">Lap 1</div>
 </div>
@@ -422,11 +424,15 @@ function updateMarkerStyles() {
   });
 }
 
-// ── Driver GPS marker ──
-function updateDriverMarker(lat, lng) {
+// ── Driver GPS marker + accuracy circle ──
+let accuracyCircleAdded = false;
+
+function updateDriverMarker(lat, lng, accuracy, heading) {
+  // Blue dot marker
   if (!driverMarker) {
     const el = document.createElement('div');
     el.style.position = 'relative';
+    el.id = 'driverDotEl';
     el.innerHTML = '<div class="driver-dot-ping"></div><div class="driver-dot"></div>';
     driverMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
       .setLngLat([lng, lat])
@@ -434,13 +440,60 @@ function updateDriverMarker(lat, lng) {
   } else {
     driverMarker.setLngLat([lng, lat]);
   }
+
+  // Heading arrow
+  if (heading !== null && heading !== undefined && !isNaN(heading)) {
+    const dot = document.querySelector('#driverDotEl .driver-dot');
+    if (dot) dot.style.transform = `rotate(${heading}deg)`;
+  }
+
+  // Accuracy circle on the map (shows GPS confidence radius)
+  if (accuracy) {
+    const circle = createGeoJSONCircle([lng, lat], accuracy);
+    if (map.getSource('accuracy-circle')) {
+      map.getSource('accuracy-circle').setData(circle);
+    } else if (map.isStyleLoaded()) {
+      map.addSource('accuracy-circle', { type: 'geojson', data: circle });
+      map.addLayer({
+        id: 'accuracy-fill', type: 'fill', source: 'accuracy-circle',
+        paint: { 'fill-color': '#4285f4', 'fill-opacity': 0.1 }
+      });
+      map.addLayer({
+        id: 'accuracy-border', type: 'line', source: 'accuracy-circle',
+        paint: { 'line-color': '#4285f4', 'line-width': 1, 'line-opacity': 0.3 }
+      });
+      accuracyCircleAdded = true;
+    }
+  }
+}
+
+// Generate a GeoJSON circle polygon (for accuracy radius)
+function createGeoJSONCircle(center, radiusMeters, points) {
+  points = points || 48;
+  const coords = [];
+  const km = radiusMeters / 1000;
+  const distanceX = km / (111.32 * Math.cos(center[1] * Math.PI / 180));
+  const distanceY = km / 110.574;
+  for (let i = 0; i < points; i++) {
+    const theta = (i / points) * (2 * Math.PI);
+    coords.push([
+      center[0] + (distanceX * Math.cos(theta)),
+      center[1] + (distanceY * Math.sin(theta))
+    ]);
+  }
+  coords.push(coords[0]);
+  return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } };
 }
 
 // ── GPS tracking ──
 let watchId = null;
+let gpsAccuracy = null;
+const MAX_ACCURACY = 150; // meters — reject readings worse than this
+
 function startGPS() {
   const statusEl = document.getElementById('gpsStatus');
   const gpsDot = document.getElementById('gpsDot');
+  const accEl = document.getElementById('gpsAccuracy');
 
   if (!navigator.geolocation) {
     statusEl.textContent = 'GPS not available on this device';
@@ -455,13 +508,37 @@ function startGPS() {
 
   watchId = navigator.geolocation.watchPosition(
     (pos) => {
+      const acc = pos.coords.accuracy; // meters
+      const heading = pos.coords.heading; // degrees or null
+      gpsAccuracy = acc;
+
+      // Show accuracy in top bar
+      if (acc <= 10) {
+        accEl.textContent = '±' + Math.round(acc) + 'm';
+        accEl.style.color = '#22c55e';
+      } else if (acc <= 30) {
+        accEl.textContent = '±' + Math.round(acc) + 'm';
+        accEl.style.color = '#eab308';
+      } else if (acc <= MAX_ACCURACY) {
+        accEl.textContent = '±' + Math.round(acc) + 'm';
+        accEl.style.color = '#f97316';
+      } else {
+        // Reading too inaccurate — show warning but don't update position
+        accEl.textContent = '±' + Math.round(acc) + 'm (weak)';
+        accEl.style.color = '#ef4444';
+        gpsDot.className = 'dot orange';
+        statusEl.textContent = 'Low GPS accuracy — move to open area';
+        statusEl.classList.add('show');
+        return; // skip this reading
+      }
+
       driverLat = pos.coords.latitude;
       driverLng = pos.coords.longitude;
 
       statusEl.classList.remove('show');
       gpsDot.className = 'dot green';
 
-      updateDriverMarker(driverLat, driverLng);
+      updateDriverMarker(driverLat, driverLng, acc, heading);
 
       if (tracking) {
         map.easeTo({ center: [driverLng, driverLat], duration: 1000 });
@@ -470,11 +547,20 @@ function startGPS() {
       checkProximity();
     },
     (err) => {
-      statusEl.textContent = 'GPS error — enable location services';
+      statusEl.textContent = err.code === 1
+        ? 'Location access denied — please allow in browser settings'
+        : err.code === 2
+        ? 'GPS unavailable — check device settings'
+        : 'GPS timeout — trying again...';
       statusEl.classList.add('show');
       gpsDot.className = 'dot red';
+      accEl.textContent = '';
     },
-    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    {
+      enableHighAccuracy: true,
+      maximumAge: 1000,   // only accept 1s old readings
+      timeout: 15000      // 15s timeout before error
+    }
   );
 }
 
