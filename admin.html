@@ -448,28 +448,34 @@ function updateRouteChip() {
 /* ═══════════════════════════════════════════
    GPS POLLING (MapsIndoors)
    ═══════════════════════════════════════════ */
+function buildTopics() {
+  return SHUTTLES.map(s => `${MI_SOLUTION}/+/+/+/+/${s.id}/position`);
+}
+
 async function pollGPS() {
   try {
-    const res = await fetch(`${MI_API}/${MI_SOLUTION}`);
+    const res = await fetch(MI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics: buildTopics() })
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
     const now = Date.now();
-    (data || []).forEach(entry => {
-      const matched = SHUTTLES.find(s => s.id === entry.objectId);
+    (data || []).forEach(item => {
+      const coords = item.properties && item.properties.coordinates;
+      if (!coords) return;
+      const matched = SHUTTLES.find(s => s.id === item.id);
       if (!matched) return;
-      const props = entry.properties || {};
-      const lat = parseFloat(props.latitude);
-      const lng = parseFloat(props.longitude);
+      const lat = parseFloat(coords.latitude);
+      const lng = parseFloat(coords.longitude);
       if (isNaN(lat) || isNaN(lng)) return;
-      gpsPositions[matched.id] = {
-        lat, lng,
-        bearing: parseFloat(props.bearing) || 0,
-        ts: now
-      };
+      gpsPositions[matched.id] = { lat, lng, ts: now };
     });
 
-    updateSystemDot('dotGps', 'lblGps', 'ok', `GPS: ${Object.keys(gpsPositions).length} signals`);
+    const activeCount = Object.values(gpsPositions).filter(p => (now - p.ts) < ACTIVE_THRESHOLD_MS).length;
+    updateSystemDot('dotGps', 'lblGps', activeCount > 0 ? 'ok' : 'warn', `GPS: ${activeCount} signals`);
   } catch (e) {
     updateSystemDot('dotGps', 'lblGps', 'err', 'GPS: connection error');
   }
