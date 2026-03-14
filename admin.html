@@ -3,158 +3,283 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SXSW Shuttle Monitor - Driver Performance</title>
+<title>SXSW Shuttle Dispatch</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
 
+  /* ── Top Bar ── */
   .top-bar {
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    padding: 16px 24px; background: rgba(15,15,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 14px 24px; background: rgba(15,15,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);
     position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px);
   }
   .top-bar h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .top-bar-right { display: flex; align-items: center; gap: 12px; }
-  .badge { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
-  .badge.live { background: rgba(34,197,94,0.15); color: #22c55e; }
-  .filter-bar {
-    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  .top-bar-left { display: flex; align-items: center; gap: 12px; }
+  .top-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .route-chip {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px;
   }
+  .route-chip.day { background: rgba(249,115,22,0.15); color: #f97316; }
+  .route-chip.night { background: rgba(34,197,94,0.15); color: #22c55e; }
   .filter-btn {
-    padding: 6px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-    background: rgba(255,255,255,0.04); color: #aaa; font-size: 12px; font-weight: 500;
+    padding: 5px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
+    background: rgba(255,255,255,0.03); color: #777; font-size: 11px; font-weight: 500;
     cursor: pointer; transition: all 0.15s;
   }
   .filter-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .filter-btn.active { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); color: #a5b4fc; }
-  .back-link { color: #6366f1; font-size: 12px; text-decoration: none; }
-  .back-link:hover { color: #a5b4fc; }
+  .filter-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+  .refresh-btn {
+    padding: 5px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
+    background: rgba(255,255,255,0.03); color: #777; font-size: 11px; cursor: pointer;
+  }
+  .refresh-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .nav-link { color: #6366f1; font-size: 11px; text-decoration: none; }
+  .nav-link:hover { color: #a5b4fc; }
 
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  /* ── Container ── */
+  .container { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
 
-  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  /* ── Section ── */
+  .section { margin-bottom: 28px; }
+  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .section-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+  .section-desc { font-size: 11px; color: #555; }
+  .section-count { font-size: 11px; color: #555; }
+
+  /* ── System Status ── */
+  .system-bar {
+    display: flex; align-items: center; gap: 20px; padding: 10px 16px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .sys-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #888; }
+  .sys-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sys-dot.ok { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
+  .sys-dot.warn { background: #f97316; }
+  .sys-dot.err { background: #ef4444; }
+  .sys-dot.off { background: #333; }
+
+  /* ── Stats Row ── */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 24px; }
   .stat-card {
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px; padding: 16px;
+    border-radius: 8px; padding: 14px;
   }
-  .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .stat-value { font-size: 28px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 26px; font-weight: 700; color: #fff; }
   .stat-value.green { color: #22c55e; }
   .stat-value.orange { color: #f97316; }
   .stat-value.red { color: #ef4444; }
-  .stat-sub { font-size: 11px; color: #555; margin-top: 4px; }
+  .stat-sub { font-size: 10px; color: #444; margin-top: 3px; }
 
-  .section { margin-bottom: 32px; }
-  .section-title { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-  .section-title .count { font-size: 11px; color: #666; font-weight: 500; }
+  /* ── Fleet Grid ── */
+  .fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .fleet-card {
+    padding: 10px 12px; border-radius: 8px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.2s;
+  }
+  .fleet-card.has-gps { border-color: rgba(34,197,94,0.25); }
+  .fleet-card.idle { opacity: 0.4; }
+  .fleet-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .fleet-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .fleet-name { font-size: 12px; font-weight: 600; color: #ccc; }
+  .fleet-ada { font-size: 9px; color: #6366f1; margin-left: 4px; }
+  .fleet-signals { display: flex; gap: 6px; margin-left: auto; }
+  .signal-tag {
+    font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 3px;
+  }
+  .signal-tag.gps-on { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .signal-tag.gps-off { background: rgba(255,255,255,0.04); color: #444; }
+  .signal-tag.drv-on { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .signal-tag.drv-off { background: rgba(255,255,255,0.04); color: #444; }
+  .fleet-location { font-size: 11px; color: #888; margin-top: 4px; }
+  .fleet-meta { font-size: 10px; color: #444; margin-top: 2px; }
 
+  /* ── Route Coverage ── */
+  .route-coverage { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .route-coverage { grid-template-columns: 1fr; } }
+  .stop-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+    border-radius: 6px; background: rgba(255,255,255,0.02); margin-bottom: 3px;
+  }
+  .stop-idx { font-size: 10px; color: #444; width: 18px; text-align: center; flex-shrink: 0; }
+  .stop-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .stop-dot.active { background: #22c55e; }
+  .stop-dot.night-only { background: #8b5cf6; }
+  .stop-name { font-size: 12px; color: #bbb; flex: 1; }
+  .stop-bar { flex: 0 0 80px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; }
+  .stop-bar-fill { height: 100%; border-radius: 3px; background: #22c55e; }
+  .stop-hits { font-size: 10px; color: #555; width: 40px; text-align: right; flex-shrink: 0; }
+  .stop-skips { font-size: 10px; color: #ef4444; width: 36px; text-align: right; flex-shrink: 0; }
+  .stop-shuttles { display: flex; gap: 3px; margin-left: 4px; }
+  .stop-shuttle-pip {
+    width: 14px; height: 14px; border-radius: 50%; font-size: 8px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+  }
+
+  /* ── Tables ── */
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-  td { font-size: 13px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-  tr:hover td { background: rgba(255,255,255,0.02); }
+  th { text-align: left; font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  td { font-size: 12px; padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tr:hover td { background: rgba(255,255,255,0.015); }
 
   .shuttle-badge {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 26px; height: 26px; border-radius: 50%;
-    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    width: 22px; height: 22px; border-radius: 50%;
+    font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0;
   }
-  .shuttle-cell { display: flex; align-items: center; gap: 10px; }
+  .shuttle-cell { display: flex; align-items: center; gap: 8px; }
 
-  .pct-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); width: 80px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
-  .pct-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .pct-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.05); width: 60px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+  .pct-fill { height: 100%; border-radius: 3px; }
 
-  .event-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-  .event-time { font-size: 11px; color: #555; width: 70px; flex-shrink: 0; }
-  .event-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
-  .event-badge.arrival { background: rgba(34,197,94,0.15); color: #22c55e; }
-  .event-badge.departure { background: rgba(59,130,246,0.15); color: #3b82f6; }
-  .event-badge.skip { background: rgba(239,68,68,0.15); color: #ef4444; }
-  .event-detail { font-size: 12px; color: #bbb; flex: 1; }
-  .event-shuttle { font-size: 11px; color: #888; }
+  /* ── Events ── */
+  .event-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .event-time { font-size: 10px; color: #444; width: 60px; flex-shrink: 0; }
+  .event-badge { font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 3px; flex-shrink: 0; }
+  .event-badge.arrival { background: rgba(34,197,94,0.12); color: #22c55e; }
+  .event-badge.departure { background: rgba(59,130,246,0.12); color: #3b82f6; }
+  .event-badge.skip { background: rgba(239,68,68,0.12); color: #ef4444; }
+  .event-detail { font-size: 11px; color: #999; flex: 1; }
+  .event-shuttle { font-size: 10px; color: #666; flex-shrink: 0; }
 
-  .skip-stop { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.02); margin-bottom: 4px; }
-  .skip-stop-name { font-size: 13px; color: #ddd; }
-  .skip-count { font-size: 13px; font-weight: 700; color: #ef4444; }
+  .empty-state { text-align: center; padding: 30px; color: #333; font-size: 12px; }
 
-  .empty-state { text-align: center; padding: 40px; color: #444; font-size: 13px; }
-
-  .driver-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
-  .driver-card {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px; border-radius: 10px;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  /* ── Explainer ── */
+  .explainer {
+    background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.15);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; font-size: 12px; color: #888; line-height: 1.6;
   }
-  .driver-card.active { border-color: rgba(34,197,94,0.3); }
-  .driver-card.stale { opacity: 0.5; }
-  .driver-dot-status {
-    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-  }
-  .driver-dot-status.online { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
-  .driver-dot-status.away { background: #f97316; }
-  .driver-dot-status.offline { background: #555; }
-  .driver-card-info { flex: 1; min-width: 0; }
-  .driver-card-stop { font-size: 13px; font-weight: 600; color: #ddd; }
-  .driver-card-meta { font-size: 11px; color: #666; margin-top: 2px; }
-  .driver-card-id { font-size: 10px; color: #444; font-family: monospace; }
+  .explainer summary { font-size: 12px; font-weight: 600; color: #a5b4fc; cursor: pointer; }
+  .explainer summary:hover { color: #c4b5fd; }
+  .explainer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  @media (max-width: 768px) { .explainer-grid { grid-template-columns: 1fr; } }
+  .explainer-item { }
+  .explainer-label { font-size: 11px; font-weight: 600; color: #a5b4fc; margin-bottom: 2px; }
+  .explainer-text { font-size: 11px; color: #666; }
 
-  .refresh-btn {
-    padding: 6px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-    background: rgba(255,255,255,0.04); color: #aaa; font-size: 12px; cursor: pointer;
-  }
-  .refresh-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
-
+  /* ── Two-col layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
     .container { padding: 16px; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
-    table { font-size: 12px; }
-    th, td { padding: 8px 6px; }
-    .top-bar { padding: 12px 16px; flex-wrap: wrap; }
+    .fleet-grid { grid-template-columns: repeat(2, 1fr); }
+    .top-bar { padding: 10px 16px; flex-wrap: wrap; }
+    table { font-size: 11px; }
+    th, td { padding: 7px 6px; }
   }
 </style>
 </head>
 <body>
 
 <div class="top-bar">
-  <div style="display:flex;align-items:center;gap:16px">
-    <h1>Driver Performance Monitor</h1>
-    <span class="badge live" id="liveStatus">Loading...</span>
+  <div class="top-bar-left">
+    <h1>Shuttle Dispatch</h1>
+    <span class="route-chip" id="routeChip">---</span>
   </div>
   <div class="top-bar-right">
-    <div class="filter-bar">
-      <button class="filter-btn active" data-range="today" onclick="setRange('today')">Today</button>
-      <button class="filter-btn" data-range="yesterday" onclick="setRange('yesterday')">Yesterday</button>
-      <button class="filter-btn" data-range="7d" onclick="setRange('7d')">Last 7 Days</button>
-      <button class="filter-btn" data-range="all" onclick="setRange('all')">All Time</button>
-    </div>
-    <button class="refresh-btn" onclick="loadData()">Refresh</button>
-    <a href="/" class="back-link">Back to Tracker</a>
+    <button class="filter-btn active" data-range="today" onclick="setRange('today')">Today</button>
+    <button class="filter-btn" data-range="yesterday" onclick="setRange('yesterday')">Yesterday</button>
+    <button class="filter-btn" data-range="7d" onclick="setRange('7d')">7 Days</button>
+    <button class="filter-btn" data-range="all" onclick="setRange('all')">All</button>
+    <button class="refresh-btn" onclick="fullRefresh()">Refresh</button>
+    <a href="/" class="nav-link">Tracker</a>
+    <a href="/driver" class="nav-link">Driver</a>
   </div>
 </div>
 
 <div class="container">
-  <div class="section" style="margin-bottom:24px">
-    <div class="section-title">Driver App Activity <span class="count" id="driverAppCount"></span></div>
-    <div id="driverAppStatus">
-      <div class="empty-state">Loading driver app data...</div>
+
+  <!-- How It Works -->
+  <details class="explainer">
+    <summary>How This Dashboard Works</summary>
+    <div class="explainer-grid">
+      <div class="explainer-item">
+        <div class="explainer-label">GPS Tracking</div>
+        <div class="explainer-text">Each shuttle has a MapsIndoors GPS tracker that broadcasts its location every few seconds. The "GPS" tag on each shuttle means we're receiving a live signal. If a shuttle shows no GPS, the hardware may be off or out of range.</div>
+      </div>
+      <div class="explainer-item">
+        <div class="explainer-label">Driver App</div>
+        <div class="explainer-text">Drivers use a mobile app (/driver) that shows their route and stops. When a driver has the app open, you'll see a "DRV" tag on their shuttle. The app reports the driver's current stop, lap count, and route type (day/night) every 30 seconds.</div>
+      </div>
+      <div class="explainer-item">
+        <div class="explainer-label">Automated Event Logging</div>
+        <div class="explainer-text">The main tracker automatically detects when a shuttle arrives at, departs from, or skips a stop based on GPS proximity. These events feed into the stats, performance tables, and lap tracking below. No manual input needed.</div>
+      </div>
+      <div class="explainer-item">
+        <div class="explainer-label">Day vs Night Route</div>
+        <div class="explainer-text">At 7 PM CT the route automatically switches from Day (11 stops) to Night (13 stops), adding Hotel Vegas and Shangri-La. The route chip in the top bar shows which mode is currently active.</div>
+      </div>
+    </div>
+  </details>
+
+  <!-- System Status -->
+  <div class="system-bar" id="systemBar">
+    <div class="sys-item"><div class="sys-dot off" id="dotGps"></div><span id="lblGps">GPS: checking...</span></div>
+    <div class="sys-item"><div class="sys-dot off" id="dotDb"></div><span id="lblDb">Database: checking...</span></div>
+    <div class="sys-item"><div class="sys-dot off" id="dotDrivers"></div><span id="lblDrivers">Driver Apps: checking...</span></div>
+    <div class="sys-item" style="margin-left:auto"><span id="lblLastUpdate" style="color:#444">--</span></div>
+  </div>
+
+  <!-- Fleet Grid -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Fleet Status</span>
+      <span class="section-desc">All 11 shuttles &mdash; green border = GPS active, DRV = driver app open</span>
+    </div>
+    <div class="fleet-grid" id="fleetGrid">
+      <div class="empty-state">Loading fleet data...</div>
     </div>
   </div>
 
+  <!-- Quick Stats -->
   <div class="stats-row" id="statsRow"></div>
 
+  <!-- Route Coverage + Live Feed -->
+  <div class="two-col">
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Route Coverage</span>
+        <span class="section-desc">Arrivals per stop &mdash; shuttles currently nearby shown as pips</span>
+      </div>
+      <div id="routeCoverage"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Live Activity</span>
+        <span class="section-count" id="eventCount"></span>
+      </div>
+      <div id="recentEvents" style="max-height:440px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <!-- Shuttle Performance Table -->
   <div class="section">
-    <div class="section-title">Shuttle Performance <span class="count" id="shuttleCount"></span></div>
+    <div class="section-header">
+      <span class="section-title">Shuttle Performance</span>
+      <span class="section-count" id="shuttleCount"></span>
+    </div>
     <div style="overflow-x:auto">
       <table>
         <thead>
           <tr>
             <th>Shuttle</th>
+            <th>Status</th>
             <th>Laps</th>
-            <th>Stops Visited</th>
-            <th>Stops Skipped</th>
+            <th>Visited</th>
+            <th>Skipped</th>
             <th>Completion</th>
             <th>Avg Dwell</th>
-            <th>Last Seen</th>
+            <th>Last Event</th>
           </tr>
         </thead>
         <tbody id="shuttleTable"></tbody>
@@ -162,20 +287,12 @@
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-    <div class="section">
-      <div class="section-title">Most Skipped Stops</div>
-      <div id="skippedStops"></div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">Recent Events <span class="count" id="eventCount"></span></div>
-      <div id="recentEvents" style="max-height:400px;overflow-y:auto"></div>
-    </div>
-  </div>
-
+  <!-- Lap History -->
   <div class="section">
-    <div class="section-title">Lap History</div>
+    <div class="section-header">
+      <span class="section-title">Lap History</span>
+      <span class="section-desc">Each completed loop of the route</span>
+    </div>
     <div style="overflow-x:auto">
       <table>
         <thead>
@@ -194,113 +311,375 @@
       </table>
     </div>
   </div>
+
 </div>
 
 <script>
+/* ═══════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════ */
 const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const MI_SOLUTION = '6b2dab7ddae2420da0b707dd';
+const MI_API = 'https://liveapi.mapsindoors.com/api/state';
+const GPS_POLL_MS = 10000;
+const ACTIVE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 const SHUTTLE_COLORS = [
   '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4',
   '#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e'
 ];
 
+const SHUTTLES = [
+  { id: 'e9525829c53340b4b6bcf62e', name: 'Shuttle 1',  num: 1,  ada: true },
+  { id: '3fbe7b87b2514cf88dd2959b', name: 'Shuttle 2',  num: 2,  ada: true },
+  { id: 'a8e138aab9c74a1e9afcb051', name: 'Shuttle 3',  num: 3 },
+  { id: '2d0bb5d4adc14172b4f6b87a', name: 'Shuttle 4',  num: 4 },
+  { id: '7b8f9c1e2d3a4b5c6d7e8f9a', name: 'Shuttle 5',  num: 5 },
+  { id: 'd9c8b7a6f5e4d3c2b1a0f9e8', name: 'Shuttle 6',  num: 6 },
+  { id: '4f5g6h7i8j9k0l1m2n3o4p5q', name: 'Shuttle 7',  num: 7 },
+  { id: '9r8s7t6u5v4w3x2y1z0a9b8c', name: 'Shuttle 8',  num: 8 },
+  { id: '3d4e5f6g7h8i9j0k1l2m3n4o', name: 'Shuttle 9',  num: 9 },
+  { id: '5p6q7r8s9t0u1v2w3x4y5z6a', name: 'Shuttle 10', num: 10 },
+  { id: '7b8c9d0e1f2g3h4i5j6k7l8m', name: 'Shuttle 11', num: 11 }
+];
+
+const ALL_STOPS = {
+  congress:    { name: '3rd & Congress',             lat: 30.26505, lng: -97.74374 },
+  paramount:   { name: 'Paramount / F&TV Clubhouse', lat: 30.26992, lng: -97.74190 },
+  downright:   { name: 'Downright / Music Clubhouse',lat: 30.27114, lng: -97.73568 },
+  shangrila:   { name: 'Shangri-La',                 lat: 30.26499, lng: -97.73198, nightOnly: true },
+  hotelvegas:  { name: 'Hotel Vegas / Low Down',     lat: 30.26357, lng: -97.72785, nightOnly: true },
+  violetcrown: { name: 'Violet Crown / ACL Live',    lat: 30.26576, lng: -97.74597 },
+  w3rd:        { name: '101 W 3rd St',               lat: 30.26530, lng: -97.74420 },
+  palmer:      { name: 'Palmer Circle Drive',        lat: 30.26017, lng: -97.75345 },
+  zach:        { name: 'Zach Theatre',               lat: 30.26492, lng: -97.75797 },
+  alamo:       { name: 'Alamo Lamar',                lat: 30.25628, lng: -97.76151 },
+  rollins:     { name: 'Rollins Theater',            lat: 30.25964, lng: -97.75392 },
+  rivian:      { name: 'Rivian',                     lat: 30.25977, lng: -97.74622 },
+  continental: { name: 'Continental Club / SoCo',    lat: 30.25044, lng: -97.74922 }
+};
+
+const DAY_ROUTE = ['congress','paramount','downright','violetcrown','w3rd','palmer','zach','alamo','rollins','rivian','continental'];
+const NIGHT_ROUTE = ['congress','paramount','downright','hotelvegas','shangrila','violetcrown','w3rd','palmer','zach','alamo','rollins','rivian','continental'];
+
+/* ═══════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════ */
 let currentRange = 'today';
-let autoRefresh = null;
+let gpsPositions = {};   // shuttleId -> { lat, lng, ts, bearing }
+let driverStatuses = []; // from sxsw_driver_app_status
+let events = [];
+let laps = [];
+
+/* ═══════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════ */
+function isNightMode() {
+  const ct = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  return new Date(ct).getHours() >= 19;
+}
+
+function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
+
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function nearestStop(lat, lng) {
+  let best = null, bestD = Infinity;
+  for (const [key, s] of Object.entries(ALL_STOPS)) {
+    const d = haversineKm({ lat, lng }, s);
+    if (d < bestD) { bestD = d; best = { key, ...s, distKm: d }; }
+  }
+  return best;
+}
 
 function getDateRange(range) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   switch (range) {
     case 'today': return today.toISOString();
-    case 'yesterday': {
-      const y = new Date(today); y.setDate(y.getDate() - 1);
-      return y.toISOString();
-    }
-    case '7d': {
-      const d = new Date(today); d.setDate(d.getDate() - 7);
-      return d.toISOString();
-    }
+    case 'yesterday': { const y = new Date(today); y.setDate(y.getDate() - 1); return y.toISOString(); }
+    case '7d': { const d = new Date(today); d.setDate(d.getDate() - 7); return d.toISOString(); }
     case 'all': return '2020-01-01T00:00:00Z';
   }
+}
+
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
+function fmtDate(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + fmtTime(ts); }
+function fmtDuration(ms) {
+  const min = Math.round(ms / 60000);
+  return min < 60 ? `${min}m` : `${Math.floor(min/60)}h ${min%60}m`;
+}
+function fmtAgo(ms) {
+  if (ms < 60000) return `${Math.round(ms/1000)}s ago`;
+  if (ms < 3600000) return `${Math.round(ms/60000)}m ago`;
+  return `${Math.round(ms/3600000)}h ago`;
 }
 
 function setRange(range) {
   currentRange = range;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.range === range));
-  loadData();
+  loadSupabaseData();
 }
 
-function fmtTime(ts) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+/* ═══════════════════════════════════════════
+   ROUTE CHIP
+   ═══════════════════════════════════════════ */
+function updateRouteChip() {
+  const chip = document.getElementById('routeChip');
+  const route = getActiveRoute();
+  if (isNightMode()) {
+    chip.className = 'route-chip night';
+    chip.textContent = `Night Route · ${route.length} stops`;
+  } else {
+    chip.className = 'route-chip day';
+    chip.textContent = `Day Route · ${route.length} stops`;
+  }
 }
 
-function fmtDate(ts) {
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + fmtTime(ts);
+/* ═══════════════════════════════════════════
+   GPS POLLING (MapsIndoors)
+   ═══════════════════════════════════════════ */
+async function pollGPS() {
+  try {
+    const res = await fetch(`${MI_API}/${MI_SOLUTION}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const now = Date.now();
+    (data || []).forEach(entry => {
+      const matched = SHUTTLES.find(s => s.id === entry.objectId);
+      if (!matched) return;
+      const props = entry.properties || {};
+      const lat = parseFloat(props.latitude);
+      const lng = parseFloat(props.longitude);
+      if (isNaN(lat) || isNaN(lng)) return;
+      gpsPositions[matched.id] = {
+        lat, lng,
+        bearing: parseFloat(props.bearing) || 0,
+        ts: now
+      };
+    });
+
+    updateSystemDot('dotGps', 'lblGps', 'ok', `GPS: ${Object.keys(gpsPositions).length} signals`);
+  } catch (e) {
+    updateSystemDot('dotGps', 'lblGps', 'err', 'GPS: connection error');
+  }
+  renderFleetGrid();
+  renderRouteCoverage();
 }
 
-function fmtDuration(ms) {
-  const min = Math.round(ms / 60000);
-  if (min < 60) return `${min}m`;
-  return `${Math.floor(min/60)}h ${min%60}m`;
-}
-
-async function loadData() {
+/* ═══════════════════════════════════════════
+   SUPABASE DATA
+   ═══════════════════════════════════════════ */
+async function loadSupabaseData() {
   const since = getDateRange(currentRange);
+  try {
+    const [eventsRes, lapsRes, driverRes] = await Promise.all([
+      sb.from('sxsw_stop_events').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(2000),
+      sb.from('sxsw_lap_summaries').select('*').gte('started_at', since).order('started_at', { ascending: false }).limit(500),
+      sb.from('sxsw_driver_app_status').select('*').order('updated_at', { ascending: false })
+    ]);
 
-  const [eventsRes, lapsRes] = await Promise.all([
-    sb.from('sxsw_stop_events').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(2000),
-    sb.from('sxsw_lap_summaries').select('*').gte('started_at', since).order('started_at', { ascending: false }).limit(500)
-  ]);
+    events = eventsRes.data || [];
+    laps = lapsRes.data || [];
+    driverStatuses = driverRes.data || [];
 
-  const events = eventsRes.data || [];
-  const laps = lapsRes.data || [];
+    updateSystemDot('dotDb', 'lblDb', 'ok', `Database: ${events.length} events loaded`);
 
-  renderStats(events, laps);
-  renderShuttleTable(events, laps);
-  renderSkippedStops(events);
-  renderRecentEvents(events);
-  renderLapTable(laps);
+    const now = Date.now();
+    const onlineDrivers = driverStatuses.filter(s => (now - new Date(s.updated_at).getTime()) < 5 * 60000).length;
+    updateSystemDot('dotDrivers', 'lblDrivers',
+      onlineDrivers > 0 ? 'ok' : 'warn',
+      `Driver Apps: ${onlineDrivers} online`
+    );
+  } catch (e) {
+    updateSystemDot('dotDb', 'lblDb', 'err', 'Database: connection error');
+  }
 
-  document.getElementById('liveStatus').textContent = `${events.length} events | Updated ${fmtTime(new Date())}`;
+  renderStats();
+  renderFleetGrid();
+  renderRouteCoverage();
+  renderShuttleTable();
+  renderRecentEvents();
+  renderLapTable();
+
+  document.getElementById('lblLastUpdate').textContent = `Updated ${fmtTime(new Date())}`;
 }
 
-function renderStats(events, laps) {
+function updateSystemDot(dotId, lblId, status, text) {
+  const dot = document.getElementById(dotId);
+  const lbl = document.getElementById(lblId);
+  dot.className = `sys-dot ${status}`;
+  lbl.textContent = text;
+}
+
+/* ═══════════════════════════════════════════
+   RENDER: Fleet Grid
+   ═══════════════════════════════════════════ */
+function renderFleetGrid() {
+  const now = Date.now();
+  const grid = document.getElementById('fleetGrid');
+
+  // Build driver lookup: shuttleNum -> status
+  const driverByNum = {};
+  driverStatuses.forEach(d => {
+    if (!driverByNum[d.shuttle_num] || new Date(d.updated_at) > new Date(driverByNum[d.shuttle_num].updated_at)) {
+      driverByNum[d.shuttle_num] = d;
+    }
+  });
+
+  grid.innerHTML = SHUTTLES.map(s => {
+    const color = SHUTTLE_COLORS[(s.num - 1) % 12];
+    const gps = gpsPositions[s.id];
+    const hasGps = gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
+    const drv = driverByNum[s.num];
+    const hasDrv = drv && (now - new Date(drv.updated_at).getTime()) < 5 * 60000;
+
+    let locationText = 'No signal';
+    let metaText = '';
+
+    if (hasGps) {
+      const ns = nearestStop(gps.lat, gps.lng);
+      if (ns) {
+        const distM = Math.round(ns.distKm * 1000);
+        locationText = distM < 100 ? `At ${ns.name}` : `Near ${ns.name} (${distM}m)`;
+      }
+      metaText = `GPS ${fmtAgo(now - gps.ts)}`;
+    }
+
+    if (hasDrv) {
+      const route = drv.route_type === 'night' ? NIGHT_ROUTE : DAY_ROUTE;
+      const stopKey = route[drv.current_stop_idx];
+      const stopName = stopKey && ALL_STOPS[stopKey] ? ALL_STOPS[stopKey].name : `Stop ${drv.current_stop_idx + 1}`;
+      if (!hasGps) locationText = `Driver at ${stopName}`;
+      metaText += `${metaText ? ' · ' : ''}Lap ${drv.lap_count} · ${drv.route_type}`;
+    }
+
+    const idle = !hasGps && !hasDrv;
+
+    return `<div class="fleet-card${hasGps ? ' has-gps' : ''}${idle ? ' idle' : ''}">
+      <div class="fleet-top">
+        <div class="fleet-num" style="background:${color}">${s.num}</div>
+        <span class="fleet-name">${s.name}${s.ada ? '<span class="fleet-ada">ADA</span>' : ''}</span>
+        <div class="fleet-signals">
+          <span class="signal-tag ${hasGps ? 'gps-on' : 'gps-off'}">GPS</span>
+          <span class="signal-tag ${hasDrv ? 'drv-on' : 'drv-off'}">DRV</span>
+        </div>
+      </div>
+      <div class="fleet-location">${locationText}</div>
+      ${metaText ? `<div class="fleet-meta">${metaText}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   RENDER: Stats
+   ═══════════════════════════════════════════ */
+function renderStats() {
   const arrivals = events.filter(e => e.event_type === 'arrival').length;
   const skips = events.filter(e => e.event_type === 'skip').length;
   const avgCompletion = laps.length > 0 ? Math.round(laps.reduce((s, l) => s + l.completion_pct, 0) / laps.length) : 0;
-  const totalLaps = laps.length;
+  const completionCls = avgCompletion >= 90 ? 'green' : avgCompletion >= 70 ? 'orange' : 'red';
 
-  const completionClass = avgCompletion >= 90 ? 'green' : avgCompletion >= 70 ? 'orange' : 'red';
+  const now = Date.now();
+  const activeShuttles = SHUTTLES.filter(s => {
+    const gps = gpsPositions[s.id];
+    return gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
+  }).length;
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Total Events</div>
+      <div class="stat-label">Shuttles Active</div>
+      <div class="stat-value${activeShuttles > 0 ? ' green' : ''}">${activeShuttles}<span style="font-size:14px;color:#555"> / 11</span></div>
+      <div class="stat-sub">transmitting GPS in last hour</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Stop Events</div>
       <div class="stat-value">${events.length}</div>
-      <div class="stat-sub">${arrivals} arrivals, ${skips} skips</div>
+      <div class="stat-sub">${arrivals} arrivals · ${skips} skips</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Laps Completed</div>
-      <div class="stat-value">${totalLaps}</div>
+      <div class="stat-value">${laps.length}</div>
       <div class="stat-sub">across all shuttles</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Avg Completion</div>
-      <div class="stat-value ${completionClass}">${avgCompletion}%</div>
+      <div class="stat-value ${completionCls}">${avgCompletion}%</div>
       <div class="stat-sub">${laps.length} lap${laps.length !== 1 ? 's' : ''} measured</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Stops Skipped</div>
-      <div class="stat-value ${skips > 0 ? 'red' : 'green'}">${skips}</div>
-      <div class="stat-sub">${arrivals > 0 ? Math.round((skips / (arrivals + skips)) * 100) : 0}% skip rate</div>
+      <div class="stat-label">Skip Rate</div>
+      <div class="stat-value ${skips > 0 ? 'red' : 'green'}">${arrivals > 0 ? Math.round((skips / (arrivals + skips)) * 100) : 0}%</div>
+      <div class="stat-sub">${skips} stop${skips !== 1 ? 's' : ''} skipped</div>
     </div>
   `;
 }
 
-function renderShuttleTable(events, laps) {
+/* ═══════════════════════════════════════════
+   RENDER: Route Coverage
+   ═══════════════════════════════════════════ */
+function renderRouteCoverage() {
+  const route = getActiveRoute();
+  const container = document.getElementById('routeCoverage');
+
+  // Count arrivals per stop
+  const arrivalsByStop = {};
+  const skipsByStop = {};
+  events.forEach(e => {
+    if (e.event_type === 'arrival') arrivalsByStop[e.stop_key] = (arrivalsByStop[e.stop_key] || 0) + 1;
+    if (e.event_type === 'skip') skipsByStop[e.stop_key] = (skipsByStop[e.stop_key] || 0) + 1;
+  });
+  const maxArrivals = Math.max(1, ...Object.values(arrivalsByStop));
+
+  // Find which shuttles are near each stop right now
+  const now = Date.now();
+  const shuttlesNearStop = {};
+  SHUTTLES.forEach(s => {
+    const gps = gpsPositions[s.id];
+    if (!gps || (now - gps.ts) > ACTIVE_THRESHOLD_MS) return;
+    const ns = nearestStop(gps.lat, gps.lng);
+    if (ns && ns.distKm < 0.15) { // within 150m
+      if (!shuttlesNearStop[ns.key]) shuttlesNearStop[ns.key] = [];
+      shuttlesNearStop[ns.key].push(s);
+    }
+  });
+
+  container.innerHTML = route.map((key, i) => {
+    const stop = ALL_STOPS[key];
+    const hits = arrivalsByStop[key] || 0;
+    const skips = skipsByStop[key] || 0;
+    const pct = Math.round((hits / maxArrivals) * 100);
+    const nearby = shuttlesNearStop[key] || [];
+    const isNight = stop.nightOnly;
+
+    return `<div class="stop-row">
+      <span class="stop-idx">${i + 1}</span>
+      <div class="stop-dot ${isNight ? 'night-only' : 'active'}"></div>
+      <span class="stop-name">${stop.name}</span>
+      <div class="stop-shuttles">${nearby.map(s =>
+        `<div class="stop-shuttle-pip" style="background:${SHUTTLE_COLORS[(s.num-1)%12]}" title="${s.name}">${s.num}</div>`
+      ).join('')}</div>
+      <div class="stop-bar"><div class="stop-bar-fill" style="width:${pct}%"></div></div>
+      <span class="stop-hits">${hits} arr</span>
+      <span class="stop-skips">${skips > 0 ? skips + ' skip' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   RENDER: Shuttle Performance Table
+   ═══════════════════════════════════════════ */
+function renderShuttleTable() {
   const byShuttle = {};
 
   events.forEach(e => {
@@ -320,13 +699,14 @@ function renderShuttleTable(events, laps) {
 
   const rows = Object.values(byShuttle).sort((a, b) => a.num - b.num);
   const tbody = document.getElementById('shuttleTable');
-  document.getElementById('shuttleCount').textContent = `(${rows.length} shuttles)`;
+  document.getElementById('shuttleCount').textContent = `(${rows.length} shuttles with data)`;
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No data for this period</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No event data for this period</td></tr>';
     return;
   }
 
+  const now = Date.now();
   tbody.innerHTML = rows.map(s => {
     const color = SHUTTLE_COLORS[(s.num - 1) % 12];
     const sLaps = lapsByShuttle[s.num] || [];
@@ -334,8 +714,16 @@ function renderShuttleTable(events, laps) {
     const avgDwell = s.departures.length > 0 ? Math.round(s.departures.reduce((a,b) => a+b, 0) / s.departures.length) : 0;
     const pctColor = avgCompletion >= 90 ? '#22c55e' : avgCompletion >= 70 ? '#f97316' : '#ef4444';
 
+    const shuttle = SHUTTLES.find(sh => sh.num === s.num);
+    const gps = shuttle ? gpsPositions[shuttle.id] : null;
+    const hasGps = gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
+    const statusHtml = hasGps
+      ? '<span style="color:#22c55e;font-size:10px">Active</span>'
+      : `<span style="color:#555;font-size:10px">${s.lastSeen ? fmtAgo(now - new Date(s.lastSeen).getTime()) : 'idle'}</span>`;
+
     return `<tr>
-      <td><div class="shuttle-cell"><div class="shuttle-badge" style="background:${color}">${s.num}</div> ${s.name}</div></td>
+      <td><div class="shuttle-cell"><div class="shuttle-badge" style="background:${color}">${s.num}</div>${s.name}</div></td>
+      <td>${statusHtml}</td>
       <td>${sLaps.length}</td>
       <td style="color:#22c55e">${s.arrivals}</td>
       <td style="color:${s.skips > 0 ? '#ef4444' : '#555'}">${s.skips}</td>
@@ -344,42 +732,21 @@ function renderShuttleTable(events, laps) {
         <div class="pct-bar"><div class="pct-fill" style="width:${avgCompletion}%;background:${pctColor}"></div></div>
       </td>
       <td>${avgDwell > 0 ? `${avgDwell}s` : '-'}</td>
-      <td style="color:#666;font-size:11px">${s.lastSeen ? fmtDate(s.lastSeen) : '-'}</td>
+      <td style="color:#555;font-size:10px">${s.lastSeen ? fmtDate(s.lastSeen) : '-'}</td>
     </tr>`;
   }).join('');
 }
 
-function renderSkippedStops(events) {
-  const skips = events.filter(e => e.event_type === 'skip');
-  const byCounts = {};
-  skips.forEach(e => {
-    if (!byCounts[e.stop_key]) byCounts[e.stop_key] = { name: e.stop_name, count: 0 };
-    byCounts[e.stop_key].count++;
-  });
-
-  const sorted = Object.values(byCounts).sort((a, b) => b.count - a.count);
-  const container = document.getElementById('skippedStops');
-
-  if (sorted.length === 0) {
-    container.innerHTML = '<div class="empty-state">No skipped stops recorded</div>';
-    return;
-  }
-
-  container.innerHTML = sorted.map(s => `
-    <div class="skip-stop">
-      <span class="skip-stop-name">${s.name}</span>
-      <span class="skip-count">${s.count} skip${s.count !== 1 ? 's' : ''}</span>
-    </div>
-  `).join('');
-}
-
-function renderRecentEvents(events) {
+/* ═══════════════════════════════════════════
+   RENDER: Recent Events
+   ═══════════════════════════════════════════ */
+function renderRecentEvents() {
   const container = document.getElementById('recentEvents');
-  const recent = events.slice(0, 50);
+  const recent = events.slice(0, 60);
   document.getElementById('eventCount').textContent = `(${events.length} total)`;
 
   if (recent.length === 0) {
-    container.innerHTML = '<div class="empty-state">No events recorded yet</div>';
+    container.innerHTML = '<div class="empty-state">No events recorded for this period</div>';
     return;
   }
 
@@ -394,16 +761,19 @@ function renderRecentEvents(events) {
       <span class="event-time">${fmtTime(e.created_at)}</span>
       <span class="event-badge ${e.event_type}">${e.event_type}</span>
       <span class="event-detail">${detail}</span>
-      <span class="event-shuttle" style="color:${color}">${e.shuttle_name}</span>
+      <span class="event-shuttle" style="color:${color}">S${e.shuttle_num}</span>
     </div>`;
   }).join('');
 }
 
-function renderLapTable(laps) {
+/* ═══════════════════════════════════════════
+   RENDER: Lap Table
+   ═══════════════════════════════════════════ */
+function renderLapTable() {
   const tbody = document.getElementById('lapTable');
 
   if (laps.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No completed laps yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No completed laps for this period</td></tr>';
     return;
   }
 
@@ -414,9 +784,9 @@ function renderLapTable(laps) {
     const seq = Array.isArray(l.stop_sequence) ? l.stop_sequence : [];
 
     return `<tr>
-      <td><div class="shuttle-cell"><div class="shuttle-badge" style="background:${color}">${l.shuttle_num}</div> ${l.shuttle_name}</div></td>
+      <td><div class="shuttle-cell"><div class="shuttle-badge" style="background:${color}">${l.shuttle_num}</div>${l.shuttle_name}</div></td>
       <td><span style="color:${l.route_type === 'night' ? '#22c55e' : '#f97316'}">${l.route_type}</span></td>
-      <td style="font-size:11px">${fmtDate(l.started_at)}</td>
+      <td style="font-size:10px">${fmtDate(l.started_at)}</td>
       <td>${duration}</td>
       <td style="color:#22c55e">${l.stops_visited}</td>
       <td style="color:${l.stops_skipped > 0 ? '#ef4444' : '#555'}">${l.stops_skipped}</td>
@@ -424,69 +794,27 @@ function renderLapTable(laps) {
         <span style="color:${pctColor}">${l.completion_pct}%</span>
         <div class="pct-bar"><div class="pct-fill" style="width:${l.completion_pct}%;background:${pctColor}"></div></div>
       </td>
-      <td style="font-size:10px;color:#666;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${seq.join(' > ')}</td>
+      <td style="font-size:9px;color:#555;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${seq.join(' → ')}</td>
     </tr>`;
   }).join('');
 }
 
-// ── Driver App Activity ──
-async function loadDriverAppStatus() {
-  const { data, error } = await sb.from('sxsw_driver_app_status')
-    .select('*')
-    .order('updated_at', { ascending: false });
-
-  const container = document.getElementById('driverAppStatus');
-  const sessions = data || [];
-
-  const now = Date.now();
-  const active = sessions.filter(s => (now - new Date(s.updated_at).getTime()) < 5 * 60000);
-  const away = sessions.filter(s => {
-    const age = now - new Date(s.updated_at).getTime();
-    return age >= 5 * 60000 && age < 60 * 60000;
-  });
-  const stale = sessions.filter(s => (now - new Date(s.updated_at).getTime()) >= 60 * 60000);
-
-  document.getElementById('driverAppCount').textContent = `(${active.length} online, ${away.length} away, ${sessions.length} total)`;
-
-  if (sessions.length === 0) {
-    container.innerHTML = '<div class="empty-state">No drivers have used the driver app yet</div>';
-    return;
-  }
-
-  function renderCard(s) {
-    const age = now - new Date(s.updated_at).getTime();
-    let statusCls, cardCls, statusText;
-    if (age < 5 * 60000) {
-      statusCls = 'online'; cardCls = 'active';
-      statusText = 'Online now';
-    } else if (age < 60 * 60000) {
-      statusCls = 'away'; cardCls = '';
-      statusText = Math.round(age / 60000) + 'm ago';
-    } else {
-      statusCls = 'offline'; cardCls = 'stale';
-      statusText = Math.round(age / 3600000) + 'h ago';
-    }
-
-    const routeLabel = s.route_type === 'night' ? '<span style="color:#22c55e">Night</span>' : '<span style="color:#f97316">Day</span>';
-
-    return `<div class="driver-card ${cardCls}">
-      <div class="driver-dot-status ${statusCls}"></div>
-      <div class="driver-card-info">
-        <div class="driver-card-stop">Stop ${s.current_stop_idx + 1}: ${s.current_stop_name || 'Unknown'}</div>
-        <div class="driver-card-meta">${routeLabel} · Lap ${s.lap_count} · ${statusText}</div>
-        <div class="driver-card-id">${s.session_id}</div>
-      </div>
-    </div>`;
-  }
-
-  const allCards = [...active, ...away, ...stale].map(renderCard).join('');
-  container.innerHTML = `<div class="driver-cards">${allCards}</div>`;
+/* ═══════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════ */
+function fullRefresh() {
+  pollGPS();
+  loadSupabaseData();
 }
 
-// Initial load + auto-refresh every 30s
-loadData();
-loadDriverAppStatus();
-autoRefresh = setInterval(() => { loadData(); loadDriverAppStatus(); }, 30000);
+updateRouteChip();
+pollGPS();
+loadSupabaseData();
+
+// GPS polls every 10s, Supabase data every 30s, route chip every 60s
+setInterval(pollGPS, GPS_POLL_MS);
+setInterval(loadSupabaseData, 30000);
+setInterval(updateRouteChip, 60000);
 </script>
 </body>
 </html>
