@@ -397,8 +397,10 @@ const API_URL = 'https://liveapi.mapsindoors.com/api/state';
 const MAPBOX_TOKEN = '__MAPBOX_TOKEN__';
 const POLL_INTERVAL = 8000;
 const ACTIVE_THRESHOLD_MS = 60 * 60 * 1000;
-const DWELL_RADIUS_KM = 0.15; // 150m
+const DWELL_RADIUS_KM = 0.15; // 150m to enter a stop
+const DWELL_LEAVE_KM = 0.25; // 250m to leave a stop (hysteresis to handle GPS jitter)
 const DWELL_POLLS = 3; // 3 polls (~24s) to count as "at stop"
+const MAX_CONSECUTIVE_SKIPS = 3; // cap skips between two arrivals to prevent false floods
 const ROAD_FACTOR = 1.3; // haversine -> road distance correction for city grid
 const SPEED_HISTORY_SIZE = 5; // rolling window of speed readings
 const MIN_SPEED_KMH = 3; // below this, consider shuttle stopped
@@ -531,19 +533,25 @@ function updateShuttleTracking(shuttleId, lat, lng) {
   });
   const nearestKey = route[nearestIdx];
 
-  // ── Dwell detection ──
-  if (!dwellTracker[shuttleId]) dwellTracker[shuttleId] = { stopKey: null, count: 0 };
+  // ── Dwell detection (with hysteresis to handle GPS jitter) ──
+  if (!dwellTracker[shuttleId]) dwellTracker[shuttleId] = { stopKey: null, count: 0, locked: false };
   const dwell = dwellTracker[shuttleId];
   if (minDist <= DWELL_RADIUS_KM && nearestKey === dwell.stopKey) {
     dwell.count++;
+    if (dwell.count >= DWELL_POLLS) dwell.locked = true; // lock once confirmed at stop
   } else if (minDist <= DWELL_RADIUS_KM) {
     dwell.stopKey = nearestKey;
     dwell.count = 1;
+    dwell.locked = false;
+  } else if (dwell.locked && minDist <= DWELL_LEAVE_KM) {
+    // GPS jitter: still within leave radius, keep locked at stop
+    dwell.count++;
   } else {
     dwell.stopKey = null;
     dwell.count = 0;
+    dwell.locked = false;
   }
-  const isAtStop = dwell.count >= DWELL_POLLS && minDist <= DWELL_RADIUS_KM;
+  const isAtStop = dwell.count >= DWELL_POLLS && minDist <= DWELL_LEAVE_KM;
 
   // ── Record observed segment travel times ──
   const prevKey = lastNearestKey[shuttleId];
@@ -1559,25 +1567,42 @@ function checkMonitoringEvents() {
         });
       }
 
-      // Detect skipped stops
-      if (ms.lastStopIdx !== null) {
-        let checkIdx = (ms.lastStopIdx + 1) % route.length;
-        let safety = 0;
-        while (checkIdx !== currentIdx && safety < route.length) {
-          const skippedKey = route[checkIdx];
-          queueEvent({
-            shuttle_id: shuttle.id, shuttle_name: shuttle.name, shuttle_num: shuttle.num,
-            stop_key: skippedKey, stop_name: ALL_STOPS[skippedKey]?.name || skippedKey,
-            event_type: 'skip', route_type: routeType, lap_id: ms.lapId,
-            dwell_seconds: null, lat: pos.lat, lng: pos.lng
-          });
-          checkIdx = (checkIdx + 1) % route.length;
-          safety++;
+      // Detect skipped stops (with route transition protection and skip cap)
+      if (ms.lastStopIdx !== null && ms.lastStopKey) {
+        // Re-resolve lastStopIdx in the current route to handle day/night transitions
+        const resolvedLastIdx = route.indexOf(ms.lastStopKey);
+        const lastIdx = resolvedLastIdx !== -1 ? resolvedLastIdx : null;
+
+        if (lastIdx !== null) {
+          // Count how many stops would be skipped first
+          let countSkips = 0;
+          let checkIdx = (lastIdx + 1) % route.length;
+          while (checkIdx !== currentIdx && countSkips < route.length) {
+            countSkips++;
+            checkIdx = (checkIdx + 1) % route.length;
+          }
+
+          // Only log skips if within reasonable cap (prevents false floods from GPS glitches or route changes)
+          if (countSkips <= MAX_CONSECUTIVE_SKIPS) {
+            checkIdx = (lastIdx + 1) % route.length;
+            let safety = 0;
+            while (checkIdx !== currentIdx && safety < route.length) {
+              const skippedKey = route[checkIdx];
+              queueEvent({
+                shuttle_id: shuttle.id, shuttle_name: shuttle.name, shuttle_num: shuttle.num,
+                stop_key: skippedKey, stop_name: ALL_STOPS[skippedKey]?.name || skippedKey,
+                event_type: 'skip', route_type: routeType, lap_id: ms.lapId,
+                dwell_seconds: null, lat: pos.lat, lng: pos.lng
+              });
+              checkIdx = (checkIdx + 1) % route.length;
+              safety++;
+            }
+          }
         }
       }
 
-      // New lap detection: arrived at first stop after visiting half+ the route
-      if (currentIdx === 0 && ms.lapStops.size >= Math.floor(route.length * 0.5)) {
+      // New lap detection: arrived at first stop after visiting 70%+ the route
+      if (currentIdx === 0 && ms.lapStops.size >= Math.floor(route.length * 0.7)) {
         saveLapSummary(shuttle, ms);
         ms.lapId = crypto.randomUUID();
         ms.lapStops = new Set();
