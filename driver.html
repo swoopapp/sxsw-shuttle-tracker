@@ -144,7 +144,7 @@
 
   /* ── Recenter / status ── */
   .recenter-btn {
-    position: absolute; bottom: 220px; right: 16px; z-index: 10;
+    position: absolute; bottom: 340px; right: 16px; z-index: 10;
     width: 44px; height: 44px; border-radius: 50%;
     background: rgba(20,20,20,0.9); backdrop-filter: blur(8px);
     border: 1px solid rgba(255,255,255,0.1);
@@ -191,6 +191,92 @@
     animation: ping 2s ease-out infinite;
   }
   @keyframes ping { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+
+  /* ── Navigation Banner ── */
+  .nav-banner {
+    background: rgba(20,20,20,0.95); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    padding: 14px 16px; margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .nav-banner-main {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .nav-arrow {
+    width: 44px; height: 44px; min-width: 44px;
+    border-radius: 12px; background: rgba(99,102,241,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #a5b4fc;
+  }
+  .nav-text { flex: 1; min-width: 0; }
+  .nav-instruction {
+    font-size: 16px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-street {
+    font-size: 12px; color: #888; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-distance {
+    font-size: 14px; font-weight: 700; color: #a5b4fc;
+    white-space: nowrap;
+  }
+  .nav-then {
+    font-size: 11px; color: #666; margin-top: 8px;
+    padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-list-toggle {
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; width: 100%; margin-top: 8px; padding: 6px;
+    border: none; background: none; color: #555; font-size: 11px;
+    font-weight: 600; cursor: pointer;
+  }
+  .nav-list-toggle:active { color: #888; }
+
+  /* ── Scrollable Instruction List ── */
+  .nav-list-container {
+    background: rgba(20,20,20,0.95); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    margin-bottom: 8px; max-height: 30vh; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-segment-header {
+    position: sticky; top: 0; z-index: 1;
+    padding: 8px 16px; background: rgba(30,30,30,0.98);
+    font-size: 11px; font-weight: 700; color: #666;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .nav-step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.2s, opacity 0.2s;
+  }
+  .nav-step:last-child { border-bottom: none; }
+  .nav-step .step-arrow {
+    width: 28px; height: 28px; min-width: 28px;
+    border-radius: 8px; background: rgba(255,255,255,0.05);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #888;
+  }
+  .nav-step .step-text {
+    flex: 1; min-width: 0; font-size: 13px; color: #aaa;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .nav-step .step-dist {
+    font-size: 11px; color: #555; white-space: nowrap;
+  }
+  .nav-step.active {
+    background: rgba(99,102,241,0.1);
+  }
+  .nav-step.active .step-arrow {
+    background: rgba(99,102,241,0.25); color: #a5b4fc;
+  }
+  .nav-step.active .step-text { color: #fff; font-weight: 600; }
+  .nav-step.active .step-dist { color: #a5b4fc; }
+  .nav-step.done { opacity: 0.3; }
 </style>
 </head>
 <body>
@@ -225,6 +311,24 @@
 <button class="recenter-btn" id="recenterBtn" onclick="recenter()">◎</button>
 
 <div class="bottom-panel">
+  <div class="nav-banner" id="navBanner" style="display:none">
+    <div class="nav-banner-main">
+      <div class="nav-arrow" id="navArrow">↑</div>
+      <div class="nav-text">
+        <div class="nav-instruction" id="navInstruction"></div>
+        <div class="nav-street" id="navStreet"></div>
+      </div>
+      <div class="nav-distance" id="navDistance"></div>
+    </div>
+    <div class="nav-then" id="navThen"></div>
+    <button class="nav-list-toggle" id="navListToggle" onclick="toggleNavList()">
+      <span id="navListToggleText">Show all steps</span>
+      <span id="navListToggleIcon">▾</span>
+    </button>
+  </div>
+  <div class="nav-list-container" id="navListContainer" style="display:none">
+    <div class="nav-list" id="navList"></div>
+  </div>
   <div class="approach-alert" id="approachAlert"></div>
   <div class="missed-alert" id="missedAlert"></div>
   <div class="next-stop-card">
@@ -328,12 +432,39 @@ let stopMarkers = [];
 let driverMarker = null;
 let pollTimer = null;
 let lastGpsTime = null;
+let navSteps = [];
+let currentStepIdx = 0;
+let navListExpanded = false;
 
 function isNightMode() {
   const h = parseInt(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
   return h >= 19;
 }
 function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
+
+// ── Intermediate waypoints to force specific roads ──
+// Each array entry = [lng, lat] waypoints between consecutive stops in the route
+// Empty arrays = let Mapbox choose the road for that segment
+const DAY_ROUTE_WAYPOINTS = [ [], [], [], [], [], [], [], [], [], [], [] ];
+const NIGHT_ROUTE_WAYPOINTS = [ [], [], [], [], [], [], [], [], [], [], [], [], [] ];
+
+// ── Maneuver arrow icons ──
+const MANEUVER_ARROWS = {
+  'straight': '↑', 'slight right': '↗', 'right': '→',
+  'sharp right': '↘', 'uturn': '↩', 'sharp left': '↙',
+  'left': '←', 'slight left': '↖',
+};
+function getManeuverArrow(type, modifier) {
+  if (type === 'arrive') return '●';
+  if (type === 'depart') return '▶';
+  if (type === 'roundabout' || type === 'rotary') return '↻';
+  return MANEUVER_ARROWS[modifier] || '↑';
+}
+function formatDist(m) {
+  if (m < 100) return Math.round(m) + ' m';
+  if (m < 1000) return (Math.round(m / 10) * 10) + ' m';
+  return (m / 1609.34).toFixed(1) + ' mi';
+}
 
 function save() {
   localStorage.setItem('driverStopIdx', currentIdx);
@@ -467,6 +598,7 @@ function startVehicleGPS() {
         }
 
         checkProximity();
+        updateNavFromGPS();
       } else {
         gpsDot.className = 'dot red';
         gpsLabel.textContent = 'No signal';
@@ -511,15 +643,27 @@ map.on('load', () => {
 
 map.on('dragstart', () => { tracking = false; updateRecenterBtn(); });
 
-// ── Route line via Mapbox Directions ──
+// ── Route line via Mapbox Directions (with turn-by-turn steps) ──
 function loadRouteLine() {
   const route = getActiveRoute();
-  const coords = [...route, route[0]].map(key => {
-    const s = ALL_STOPS[key];
-    return `${s.lng},${s.lat}`;
-  }).join(';');
+  const waypoints = isNightMode() ? NIGHT_ROUTE_WAYPOINTS : DAY_ROUTE_WAYPOINTS;
 
-  fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`)
+  // Build coordinate list: stops + intermediate waypoints
+  const coordList = [];
+  for (let i = 0; i <= route.length; i++) {
+    const stopIdx = i % route.length;
+    const stop = ALL_STOPS[route[stopIdx]];
+    coordList.push({ lng: stop.lng, lat: stop.lat, isStop: true, stopKey: route[stopIdx] });
+    if (i < route.length && waypoints[i] && waypoints[i].length > 0) {
+      waypoints[i].forEach(([lng, lat]) => {
+        coordList.push({ lng, lat, isStop: false });
+      });
+    }
+  }
+
+  const coordStr = coordList.map(c => `${c.lng},${c.lat}`).join(';');
+
+  fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${coordStr}?geometries=geojson&overview=full&steps=true&banner_instructions=true&access_token=${mapboxgl.accessToken}`)
     .then(r => r.json())
     .then(data => {
       if (!data.routes || !data.routes[0]) return;
@@ -534,8 +678,197 @@ function loadRouteLine() {
           paint: { 'line-color': '#6366f1', 'line-width': 4, 'line-opacity': 0.7 } });
       }
       routeLineLoaded = true;
+      processDirectionsSteps(data.routes[0], coordList, route);
     })
     .catch(err => console.warn('Route line error:', err));
+}
+
+// ── Process Directions API steps into flat nav step list ──
+function processDirectionsSteps(routeData, coordList, stopRoute) {
+  const steps = [];
+  const legs = routeData.legs;
+
+  // Map each leg to its stop-to-stop segment index
+  let segIdx = 0;
+  const legSegment = [];
+  for (let i = 0; i < legs.length; i++) {
+    legSegment.push(segIdx);
+    if (coordList[i + 1].isStop) segIdx++;
+  }
+
+  for (let i = 0; i < legs.length; i++) {
+    const seg = legSegment[i];
+    const fromKey = stopRoute[seg % stopRoute.length];
+    const toKey = stopRoute[(seg + 1) % stopRoute.length];
+    const fromCoord = coordList[i];
+    const toCoord = coordList[i + 1];
+
+    for (const step of legs[i].steps) {
+      const m = step.maneuver;
+      // Skip depart/arrive at intermediate waypoints
+      if (!fromCoord.isStop && m.type === 'depart') continue;
+      if (!toCoord.isStop && m.type === 'arrive') continue;
+
+      steps.push({
+        instruction: m.instruction,
+        modifier: m.modifier || '',
+        type: m.type,
+        location: m.location, // [lng, lat]
+        distance: step.distance,
+        streetName: step.name || '',
+        stopBefore: fromKey,
+        stopAfter: toKey,
+        segmentIdx: seg,
+      });
+    }
+  }
+
+  navSteps = steps;
+  currentStepIdx = 0;
+  advanceToCurrentSegment();
+  updateNavBanner();
+  updateNavList();
+}
+
+// ── Get the active segment index based on current stop ──
+function getActiveSegment() {
+  const route = getActiveRoute();
+  // At fresh start (heading to first stop, first lap), show first segment
+  if (currentIdx === 0 && lapCount <= 1) return 0;
+  // Otherwise, show the segment leading TO currentIdx
+  return (currentIdx - 1 + route.length) % route.length;
+}
+
+// ── Advance currentStepIdx to match the active segment ──
+function advanceToCurrentSegment() {
+  if (navSteps.length === 0) return;
+  const activeSeg = getActiveSegment();
+  for (let i = 0; i < navSteps.length; i++) {
+    if (navSteps[i].segmentIdx === activeSeg) {
+      currentStepIdx = i;
+      return;
+    }
+  }
+  currentStepIdx = 0;
+}
+
+// ── Navigation Banner UI ──
+function updateNavBanner() {
+  const banner = document.getElementById('navBanner');
+  if (navSteps.length === 0) { banner.style.display = 'none'; return; }
+
+  banner.style.display = '';
+  const step = navSteps[currentStepIdx];
+  const nextStep = currentStepIdx + 1 < navSteps.length ? navSteps[currentStepIdx + 1] : null;
+
+  document.getElementById('navArrow').textContent = getManeuverArrow(step.type, step.modifier);
+  document.getElementById('navInstruction').textContent = step.instruction;
+  document.getElementById('navStreet').textContent = step.streetName ? 'on ' + step.streetName : '';
+  document.getElementById('navDistance').textContent = formatDist(step.distance);
+
+  const thenEl = document.getElementById('navThen');
+  if (nextStep) {
+    thenEl.textContent = 'Then: ' + nextStep.instruction;
+    thenEl.style.display = '';
+  } else {
+    thenEl.style.display = 'none';
+  }
+}
+
+// ── Scrollable Instruction List ──
+function updateNavList() {
+  const list = document.getElementById('navList');
+  if (navSteps.length === 0) { list.innerHTML = ''; return; }
+
+  let html = '';
+  let lastSeg = -1;
+
+  for (let i = 0; i < navSteps.length; i++) {
+    const step = navSteps[i];
+    if (step.segmentIdx !== lastSeg) {
+      lastSeg = step.segmentIdx;
+      const fromName = ALL_STOPS[step.stopBefore]?.name || step.stopBefore;
+      const toName = ALL_STOPS[step.stopAfter]?.name || step.stopAfter;
+      html += `<div class="nav-segment-header">${fromName} → ${toName}</div>`;
+    }
+    let cls = 'nav-step';
+    if (i === currentStepIdx) cls += ' active';
+    else if (i < currentStepIdx) cls += ' done';
+    const arrow = getManeuverArrow(step.type, step.modifier);
+    html += `<div class="${cls}" id="nav-step-${i}">
+      <div class="step-arrow">${arrow}</div>
+      <div class="step-text">${step.instruction}</div>
+      <div class="step-dist">${formatDist(step.distance)}</div>
+    </div>`;
+  }
+
+  list.innerHTML = html;
+  scrollToActiveStep();
+}
+
+function scrollToActiveStep() {
+  const container = document.getElementById('navListContainer');
+  const activeEl = document.getElementById(`nav-step-${currentStepIdx}`);
+  if (activeEl && container.style.display !== 'none') {
+    activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function updateNavListHighlight() {
+  const steps = document.querySelectorAll('.nav-step');
+  steps.forEach(el => {
+    const idx = parseInt(el.id.replace('nav-step-', ''));
+    el.classList.remove('active', 'done');
+    if (idx === currentStepIdx) el.classList.add('active');
+    else if (idx < currentStepIdx) el.classList.add('done');
+  });
+  scrollToActiveStep();
+}
+
+function toggleNavList() {
+  navListExpanded = !navListExpanded;
+  document.getElementById('navListContainer').style.display = navListExpanded ? '' : 'none';
+  document.getElementById('navListToggleText').textContent = navListExpanded ? 'Hide steps' : 'Show all steps';
+  document.getElementById('navListToggleIcon').textContent = navListExpanded ? '▴' : '▾';
+  if (navListExpanded) scrollToActiveStep();
+}
+
+// ── GPS-synced navigation step matching ──
+function updateNavFromGPS() {
+  if (navSteps.length === 0 || driverLat === null) return;
+
+  const activeSeg = getActiveSegment();
+  let changed = false;
+
+  // Advance forward: if closer to next step than current, move forward
+  let advancing = true;
+  while (advancing) {
+    advancing = false;
+    const nextIdx = currentStepIdx + 1;
+    if (nextIdx < navSteps.length && navSteps[nextIdx].segmentIdx === activeSeg) {
+      const [cLng, cLat] = navSteps[currentStepIdx].location;
+      const [nLng, nLat] = navSteps[nextIdx].location;
+      const distCurr = haversine(driverLat, driverLng, cLat, cLng);
+      const distNext = haversine(driverLat, driverLng, nLat, nLng);
+      if (distNext < distCurr) {
+        currentStepIdx = nextIdx;
+        advancing = true;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    updateNavBanner();
+    updateNavListHighlight();
+  }
+
+  // Update live distance to current maneuver point
+  if (navSteps[currentStepIdx]) {
+    const [lng, lat] = navSteps[currentStepIdx].location;
+    const dist = haversine(driverLat, driverLng, lat, lng);
+    document.getElementById('navDistance').textContent = formatDist(dist);
+  }
 }
 
 // ── Stop markers ──
@@ -647,6 +980,9 @@ function arrivedAtStop() {
   document.getElementById('missedAlert').className = 'missed-alert';
   document.getElementById('btnArrived').classList.remove('pulse');
 
+  advanceToCurrentSegment();
+  updateNavBanner();
+  updateNavList();
   updateUI();
 
   const nextKey = route[currentIdx] || route[0];
@@ -670,6 +1006,9 @@ function prevStop() {
   document.getElementById('approachAlert').className = 'approach-alert';
   document.getElementById('missedAlert').className = 'missed-alert';
   document.getElementById('btnArrived').classList.remove('pulse');
+  advanceToCurrentSegment();
+  updateNavBanner();
+  updateNavList();
   updateUI();
 }
 
