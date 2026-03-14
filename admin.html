@@ -81,7 +81,7 @@
     background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
     transition: border-color 0.2s;
   }
-  .fleet-card.has-gps { border-color: rgba(34,197,94,0.25); }
+  .fleet-card.active { border-color: rgba(34,197,94,0.25); }
   .fleet-card.idle { opacity: 0.4; }
   .fleet-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .fleet-num {
@@ -95,16 +95,13 @@
   .signal-tag {
     font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 3px;
   }
-  .signal-tag.gps-on { background: rgba(34,197,94,0.15); color: #22c55e; }
-  .signal-tag.gps-off { background: rgba(255,255,255,0.04); color: #444; }
-  .signal-tag.drv-on { background: rgba(99,102,241,0.15); color: #818cf8; }
-  .signal-tag.drv-off { background: rgba(255,255,255,0.04); color: #444; }
+  .signal-tag.on { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .signal-tag.away { background: rgba(249,115,22,0.15); color: #f97316; }
+  .signal-tag.off { background: rgba(255,255,255,0.04); color: #444; }
   .fleet-location { font-size: 11px; color: #888; margin-top: 4px; }
   .fleet-meta { font-size: 10px; color: #444; margin-top: 2px; }
 
   /* ── Route Coverage ── */
-  .route-coverage { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 768px) { .route-coverage { grid-template-columns: 1fr; } }
   .stop-row {
     display: flex; align-items: center; gap: 10px; padding: 6px 10px;
     border-radius: 6px; background: rgba(255,255,255,0.02); margin-bottom: 3px;
@@ -161,7 +158,6 @@
   .explainer summary:hover { color: #c4b5fd; }
   .explainer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   @media (max-width: 768px) { .explainer-grid { grid-template-columns: 1fr; } }
-  .explainer-item { }
   .explainer-label { font-size: 11px; font-weight: 600; color: #a5b4fc; margin-bottom: 2px; }
   .explainer-text { font-size: 11px; color: #666; }
 
@@ -190,7 +186,7 @@
     <button class="filter-btn" data-range="yesterday" onclick="setRange('yesterday')">Yesterday</button>
     <button class="filter-btn" data-range="7d" onclick="setRange('7d')">7 Days</button>
     <button class="filter-btn" data-range="all" onclick="setRange('all')">All</button>
-    <button class="refresh-btn" onclick="fullRefresh()">Refresh</button>
+    <button class="refresh-btn" onclick="loadData()">Refresh</button>
     <a href="/" class="nav-link">Tracker</a>
     <a href="/driver" class="nav-link">Driver</a>
   </div>
@@ -203,29 +199,29 @@
     <summary>How This Dashboard Works</summary>
     <div class="explainer-grid">
       <div class="explainer-item">
-        <div class="explainer-label">GPS Tracking</div>
-        <div class="explainer-text">Each shuttle has a MapsIndoors GPS tracker that broadcasts its location every few seconds. The "GPS" tag on each shuttle means we're receiving a live signal. If a shuttle shows no GPS, the hardware may be off or out of range.</div>
-      </div>
-      <div class="explainer-item">
         <div class="explainer-label">Driver App</div>
-        <div class="explainer-text">Drivers use a mobile app (/driver) that shows their route and stops. When a driver has the app open, you'll see a "DRV" tag on their shuttle. The app reports the driver's current stop, lap count, and route type (day/night) every 30 seconds.</div>
+        <div class="explainer-text">Drivers use a mobile app (/driver) that shows their route and stops. When a driver has the app open, their shuttle shows as "Online" with their current stop, lap count, and route type. The app reports every 30 seconds.</div>
       </div>
       <div class="explainer-item">
         <div class="explainer-label">Automated Event Logging</div>
-        <div class="explainer-text">The main tracker automatically detects when a shuttle arrives at, departs from, or skips a stop based on GPS proximity. These events feed into the stats, performance tables, and lap tracking below. No manual input needed.</div>
+        <div class="explainer-text">The main tracker (/tracker) automatically detects when a shuttle arrives at, departs from, or skips a stop using GPS proximity. These events feed into the stats, performance tables, and lap tracking below.</div>
       </div>
       <div class="explainer-item">
         <div class="explainer-label">Day vs Night Route</div>
-        <div class="explainer-text">At 7 PM CT the route automatically switches from Day (11 stops) to Night (13 stops), adding Hotel Vegas and Shangri-La. The route chip in the top bar shows which mode is currently active.</div>
+        <div class="explainer-text">At 7 PM CT the route switches from Day (11 stops) to Night (13 stops), adding Hotel Vegas and Shangri-La. The route chip in the top bar shows which mode is active.</div>
+      </div>
+      <div class="explainer-item">
+        <div class="explainer-label">Fleet Status</div>
+        <div class="explainer-text">Each shuttle card shows its status: Online (driver app active in last 5 min), Away (5-60 min since last check-in), or Offline. Data comes from the driver app and logged events in the database.</div>
       </div>
     </div>
   </details>
 
   <!-- System Status -->
   <div class="system-bar" id="systemBar">
-    <div class="sys-item"><div class="sys-dot off" id="dotGps"></div><span id="lblGps">GPS: checking...</span></div>
     <div class="sys-item"><div class="sys-dot off" id="dotDb"></div><span id="lblDb">Database: checking...</span></div>
-    <div class="sys-item"><div class="sys-dot off" id="dotDrivers"></div><span id="lblDrivers">Driver Apps: checking...</span></div>
+    <div class="sys-item"><div class="sys-dot off" id="dotDrivers"></div><span id="lblDrivers">Drivers: checking...</span></div>
+    <div class="sys-item"><div class="sys-dot off" id="dotEvents"></div><span id="lblEvents">Events: checking...</span></div>
     <div class="sys-item" style="margin-left:auto"><span id="lblLastUpdate" style="color:#444">--</span></div>
   </div>
 
@@ -233,7 +229,7 @@
   <div class="section">
     <div class="section-header">
       <span class="section-title">Fleet Status</span>
-      <span class="section-desc">All 11 shuttles &mdash; green border = GPS active, DRV = driver app open</span>
+      <span class="section-desc">All 11 shuttles &mdash; based on driver app check-ins and logged events</span>
     </div>
     <div class="fleet-grid" id="fleetGrid">
       <div class="empty-state">Loading fleet data...</div>
@@ -248,7 +244,7 @@
     <div class="section">
       <div class="section-header">
         <span class="section-title">Route Coverage</span>
-        <span class="section-desc">Arrivals per stop &mdash; shuttles currently nearby shown as pips</span>
+        <span class="section-desc">Arrivals per stop &mdash; shuttles at each stop shown as pips</span>
       </div>
       <div id="routeCoverage"></div>
     </div>
@@ -322,28 +318,23 @@ const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const MI_SOLUTION = '6b2dab7ddae2420da0b707dd';
-const MI_API = 'https://liveapi.mapsindoors.com/api/state';
-const GPS_POLL_MS = 10000;
-const ACTIVE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
-
 const SHUTTLE_COLORS = [
   '#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4',
   '#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e'
 ];
 
 const SHUTTLES = [
-  { id: 'e9525829c53340b4b6bcf62e', name: 'Shuttle 1',  num: 1,  ada: true },
-  { id: '3fbe7b87b2514cf88dd2959b', name: 'Shuttle 2',  num: 2,  ada: true },
-  { id: 'a8e138aab9c74a1e9afcb051', name: 'Shuttle 3',  num: 3 },
-  { id: '966d0e5cbe024e9a94afb345', name: 'Shuttle 4',  num: 4 },
-  { id: '6638cfc9240f4b41a8273f41', name: 'Shuttle 5',  num: 5 },
-  { id: '99b7d83570cc4d7ba234b653', name: 'Shuttle 6',  num: 6 },
-  { id: '7339ecf0f94949a9a5c0fb6e', name: 'Shuttle 7',  num: 7 },
-  { id: '9e50f5c2ad2c47498f6e30cb', name: 'Shuttle 8',  num: 8 },
-  { id: 'ed0bf01640f54f31870f08cd', name: 'Shuttle 9',  num: 9 },
-  { id: '75c77ccb07274878ac13be62', name: 'Shuttle 10', num: 10 },
-  { id: 'c0237622c71746278279628d', name: 'Shuttle 11', num: 11 }
+  { name: 'Shuttle 1',  num: 1,  ada: true },
+  { name: 'Shuttle 2',  num: 2,  ada: true },
+  { name: 'Shuttle 3',  num: 3 },
+  { name: 'Shuttle 4',  num: 4 },
+  { name: 'Shuttle 5',  num: 5 },
+  { name: 'Shuttle 6',  num: 6 },
+  { name: 'Shuttle 7',  num: 7 },
+  { name: 'Shuttle 8',  num: 8 },
+  { name: 'Shuttle 9',  num: 9 },
+  { name: 'Shuttle 10', num: 10 },
+  { name: 'Shuttle 11', num: 11 }
 ];
 
 const ALL_STOPS = {
@@ -369,7 +360,6 @@ const NIGHT_ROUTE = ['congress','paramount','downright','hotelvegas','shangrila'
    STATE
    ═══════════════════════════════════════════ */
 let currentRange = 'today';
-let gpsPositions = {};   // shuttleId -> { lat, lng, ts, bearing }
 let driverStatuses = []; // from sxsw_driver_app_status
 let events = [];
 let laps = [];
@@ -383,23 +373,6 @@ function isNightMode() {
 }
 
 function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
-
-function haversineKm(a, b) {
-  const R = 6371;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
-
-function nearestStop(lat, lng) {
-  let best = null, bestD = Infinity;
-  for (const [key, s] of Object.entries(ALL_STOPS)) {
-    const d = haversineKm({ lat, lng }, s);
-    if (d < bestD) { bestD = d; best = { key, ...s, distKm: d }; }
-  }
-  return best;
-}
 
 function getDateRange(range) {
   const now = new Date();
@@ -424,10 +397,17 @@ function fmtAgo(ms) {
   return `${Math.round(ms/3600000)}h ago`;
 }
 
+// Extract shuttle number from driver app session_id ("shuttle_3" -> 3)
+function parseDriverNum(d) {
+  if (d.shuttle_num) return d.shuttle_num;
+  if (d.session_id && d.session_id.startsWith('shuttle_')) return parseInt(d.session_id.split('_')[1]);
+  return null;
+}
+
 function setRange(range) {
   currentRange = range;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.range === range));
-  loadSupabaseData();
+  loadData();
 }
 
 /* ═══════════════════════════════════════════
@@ -446,51 +426,9 @@ function updateRouteChip() {
 }
 
 /* ═══════════════════════════════════════════
-   GPS POLLING (MapsIndoors)
+   LOAD DATA (all from Supabase)
    ═══════════════════════════════════════════ */
-function buildTopics() {
-  return SHUTTLES.map(s => `${MI_SOLUTION}/+/+/+/+/${s.id}/position`);
-}
-
-async function pollGPS() {
-  try {
-    const res = await fetch(MI_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topics: buildTopics() })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    const now = Date.now();
-    const items = data || [];
-    let matched_count = 0;
-    items.forEach(item => {
-      const coords = item.properties && item.properties.coordinates;
-      if (!coords) return;
-      const matched = SHUTTLES.find(s => s.id === item.id);
-      if (!matched) return;
-      matched_count++;
-      const lat = parseFloat(coords.latitude);
-      const lng = parseFloat(coords.longitude);
-      if (isNaN(lat) || isNaN(lng)) return;
-      gpsPositions[matched.id] = { lat, lng, ts: now };
-    });
-
-    const activeCount = Object.values(gpsPositions).filter(p => (now - p.ts) < ACTIVE_THRESHOLD_MS).length;
-    updateSystemDot('dotGps', 'lblGps', activeCount > 0 ? 'ok' : 'warn', `GPS: ${activeCount} signals (${items.length} raw, ${matched_count} matched)`);
-  } catch (e) {
-    console.error('GPS poll error:', e);
-    updateSystemDot('dotGps', 'lblGps', 'err', `GPS: error - ${e.message}`);
-  }
-  renderFleetGrid();
-  renderRouteCoverage();
-}
-
-/* ═══════════════════════════════════════════
-   SUPABASE DATA
-   ═══════════════════════════════════════════ */
-async function loadSupabaseData() {
+async function loadData() {
   const since = getDateRange(currentRange);
   try {
     const [eventsRes, lapsRes, driverRes] = await Promise.all([
@@ -503,13 +441,23 @@ async function loadSupabaseData() {
     laps = lapsRes.data || [];
     driverStatuses = driverRes.data || [];
 
-    updateSystemDot('dotDb', 'lblDb', 'ok', `Database: ${events.length} events loaded`);
+    updateSystemDot('dotDb', 'lblDb', 'ok', 'Database: connected');
 
     const now = Date.now();
-    const onlineDrivers = driverStatuses.filter(s => (now - new Date(s.updated_at).getTime()) < 5 * 60000).length;
+    const online = driverStatuses.filter(s => (now - new Date(s.updated_at).getTime()) < 5 * 60000).length;
+    const away = driverStatuses.filter(s => {
+      const age = now - new Date(s.updated_at).getTime();
+      return age >= 5 * 60000 && age < 60 * 60000;
+    }).length;
     updateSystemDot('dotDrivers', 'lblDrivers',
-      onlineDrivers > 0 ? 'ok' : 'warn',
-      `Driver Apps: ${onlineDrivers} online`
+      online > 0 ? 'ok' : away > 0 ? 'warn' : 'off',
+      `Drivers: ${online} online${away > 0 ? `, ${away} away` : ''}`
+    );
+
+    const recentEvents = events.filter(e => (now - new Date(e.created_at).getTime()) < 60 * 60000).length;
+    updateSystemDot('dotEvents', 'lblEvents',
+      recentEvents > 0 ? 'ok' : 'warn',
+      `Events: ${recentEvents} in last hour (${events.length} total)`
     );
   } catch (e) {
     updateSystemDot('dotDb', 'lblDb', 'err', 'Database: connection error');
@@ -526,10 +474,8 @@ async function loadSupabaseData() {
 }
 
 function updateSystemDot(dotId, lblId, status, text) {
-  const dot = document.getElementById(dotId);
-  const lbl = document.getElementById(lblId);
-  dot.className = `sys-dot ${status}`;
-  lbl.textContent = text;
+  document.getElementById(dotId).className = `sys-dot ${status}`;
+  document.getElementById(lblId).textContent = text;
 }
 
 /* ═══════════════════════════════════════════
@@ -539,53 +485,63 @@ function renderFleetGrid() {
   const now = Date.now();
   const grid = document.getElementById('fleetGrid');
 
-  // Build driver lookup: shuttleNum -> status
-  // Driver app writes session_id like "shuttle_3", extract num from that
+  // Build driver lookup: shuttleNum -> latest status
   const driverByNum = {};
   driverStatuses.forEach(d => {
-    const num = d.shuttle_num || (d.session_id && d.session_id.startsWith('shuttle_') ? parseInt(d.session_id.split('_')[1]) : null);
+    const num = parseDriverNum(d);
     if (!num) return;
     if (!driverByNum[num] || new Date(d.updated_at) > new Date(driverByNum[num].updated_at)) {
       driverByNum[num] = d;
     }
   });
 
+  // Build last event lookup: shuttleNum -> latest event
+  const lastEventByNum = {};
+  events.forEach(e => {
+    if (!lastEventByNum[e.shuttle_num] || new Date(e.created_at) > new Date(lastEventByNum[e.shuttle_num].created_at)) {
+      lastEventByNum[e.shuttle_num] = e;
+    }
+  });
+
   grid.innerHTML = SHUTTLES.map(s => {
     const color = SHUTTLE_COLORS[(s.num - 1) % 12];
-    const gps = gpsPositions[s.id];
-    const hasGps = gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
     const drv = driverByNum[s.num];
-    const hasDrv = drv && (now - new Date(drv.updated_at).getTime()) < 5 * 60000;
+    const lastEvt = lastEventByNum[s.num];
 
-    let locationText = 'No signal';
+    // Determine status from driver app
+    let status = 'offline'; // offline / away / online
+    let drvAge = Infinity;
+    if (drv) {
+      drvAge = now - new Date(drv.updated_at).getTime();
+      if (drvAge < 5 * 60000) status = 'online';
+      else if (drvAge < 60 * 60000) status = 'away';
+    }
+
+    // Location from driver app current stop
+    let locationText = 'No data';
     let metaText = '';
 
-    if (hasGps) {
-      const ns = nearestStop(gps.lat, gps.lng);
-      if (ns) {
-        const distM = Math.round(ns.distKm * 1000);
-        locationText = distM < 100 ? `At ${ns.name}` : `Near ${ns.name} (${distM}m)`;
-      }
-      metaText = `GPS ${fmtAgo(now - gps.ts)}`;
+    if (drv && status !== 'offline') {
+      const stopName = drv.current_stop_name || `Stop ${(drv.current_stop_idx || 0) + 1}`;
+      locationText = status === 'online' ? `At ${stopName}` : `Last at ${stopName}`;
+      metaText = `Lap ${drv.lap_count || 0} · ${drv.route_type || 'day'} · ${fmtAgo(drvAge)}`;
+    } else if (lastEvt) {
+      // Fallback: use last logged event
+      const evtAge = now - new Date(lastEvt.created_at).getTime();
+      locationText = `Last event: ${lastEvt.stop_name}`;
+      metaText = `${lastEvt.event_type} · ${fmtAgo(evtAge)}`;
     }
 
-    if (hasDrv) {
-      const route = drv.route_type === 'night' ? NIGHT_ROUTE : DAY_ROUTE;
-      const stopKey = route[drv.current_stop_idx];
-      const stopName = stopKey && ALL_STOPS[stopKey] ? ALL_STOPS[stopKey].name : `Stop ${drv.current_stop_idx + 1}`;
-      if (!hasGps) locationText = `Driver at ${stopName}`;
-      metaText += `${metaText ? ' · ' : ''}Lap ${drv.lap_count} · ${drv.route_type}`;
-    }
+    const isActive = status === 'online' || status === 'away';
+    const tagClass = status === 'online' ? 'on' : status === 'away' ? 'away' : 'off';
+    const tagLabel = status === 'online' ? 'Online' : status === 'away' ? 'Away' : 'Offline';
 
-    const idle = !hasGps && !hasDrv;
-
-    return `<div class="fleet-card${hasGps ? ' has-gps' : ''}${idle ? ' idle' : ''}">
+    return `<div class="fleet-card${status === 'online' ? ' active' : ''}${!isActive ? ' idle' : ''}">
       <div class="fleet-top">
         <div class="fleet-num" style="background:${color}">${s.num}</div>
         <span class="fleet-name">${s.name}${s.ada ? '<span class="fleet-ada">ADA</span>' : ''}</span>
         <div class="fleet-signals">
-          <span class="signal-tag ${hasGps ? 'gps-on' : 'gps-off'}">GPS</span>
-          <span class="signal-tag ${hasDrv ? 'drv-on' : 'drv-off'}">DRV</span>
+          <span class="signal-tag ${tagClass}">${tagLabel}</span>
         </div>
       </div>
       <div class="fleet-location">${locationText}</div>
@@ -604,16 +560,13 @@ function renderStats() {
   const completionCls = avgCompletion >= 90 ? 'green' : avgCompletion >= 70 ? 'orange' : 'red';
 
   const now = Date.now();
-  const activeShuttles = SHUTTLES.filter(s => {
-    const gps = gpsPositions[s.id];
-    return gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
-  }).length;
+  const onlineCount = driverStatuses.filter(d => (now - new Date(d.updated_at).getTime()) < 5 * 60000).length;
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Shuttles Active</div>
-      <div class="stat-value${activeShuttles > 0 ? ' green' : ''}">${activeShuttles}<span style="font-size:14px;color:#555"> / 11</span></div>
-      <div class="stat-sub">transmitting GPS in last hour</div>
+      <div class="stat-label">Drivers Online</div>
+      <div class="stat-value${onlineCount > 0 ? ' green' : ''}">${onlineCount}<span style="font-size:14px;color:#555"> / 11</span></div>
+      <div class="stat-sub">driver app active now</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Stop Events</div>
@@ -654,17 +607,25 @@ function renderRouteCoverage() {
   });
   const maxArrivals = Math.max(1, ...Object.values(arrivalsByStop));
 
-  // Find which shuttles are near each stop right now
+  // Find which shuttles are at each stop (from driver app)
   const now = Date.now();
-  const shuttlesNearStop = {};
-  SHUTTLES.forEach(s => {
-    const gps = gpsPositions[s.id];
-    if (!gps || (now - gps.ts) > ACTIVE_THRESHOLD_MS) return;
-    const ns = nearestStop(gps.lat, gps.lng);
-    if (ns && ns.distKm < 0.15) { // within 150m
-      if (!shuttlesNearStop[ns.key]) shuttlesNearStop[ns.key] = [];
-      shuttlesNearStop[ns.key].push(s);
+  const driverByNum = {};
+  driverStatuses.forEach(d => {
+    const num = parseDriverNum(d);
+    if (!num) return;
+    if (!driverByNum[num] || new Date(d.updated_at) > new Date(driverByNum[num].updated_at)) {
+      driverByNum[num] = d;
     }
+  });
+
+  const shuttlesAtStop = {};
+  SHUTTLES.forEach(s => {
+    const drv = driverByNum[s.num];
+    if (!drv || (now - new Date(drv.updated_at).getTime()) > 5 * 60000) return;
+    const stopKey = drv.current_stop_key;
+    if (!stopKey) return;
+    if (!shuttlesAtStop[stopKey]) shuttlesAtStop[stopKey] = [];
+    shuttlesAtStop[stopKey].push(s);
   });
 
   container.innerHTML = route.map((key, i) => {
@@ -672,7 +633,7 @@ function renderRouteCoverage() {
     const hits = arrivalsByStop[key] || 0;
     const skips = skipsByStop[key] || 0;
     const pct = Math.round((hits / maxArrivals) * 100);
-    const nearby = shuttlesNearStop[key] || [];
+    const nearby = shuttlesAtStop[key] || [];
     const isNight = stop.nightOnly;
 
     return `<div class="stop-row">
@@ -710,6 +671,17 @@ function renderShuttleTable() {
     lapsByShuttle[l.shuttle_num].push(l);
   });
 
+  // Build driver lookup for status
+  const now = Date.now();
+  const driverByNum = {};
+  driverStatuses.forEach(d => {
+    const num = parseDriverNum(d);
+    if (!num) return;
+    if (!driverByNum[num] || new Date(d.updated_at) > new Date(driverByNum[num].updated_at)) {
+      driverByNum[num] = d;
+    }
+  });
+
   const rows = Object.values(byShuttle).sort((a, b) => a.num - b.num);
   const tbody = document.getElementById('shuttleTable');
   document.getElementById('shuttleCount').textContent = `(${rows.length} shuttles with data)`;
@@ -719,7 +691,6 @@ function renderShuttleTable() {
     return;
   }
 
-  const now = Date.now();
   tbody.innerHTML = rows.map(s => {
     const color = SHUTTLE_COLORS[(s.num - 1) % 12];
     const sLaps = lapsByShuttle[s.num] || [];
@@ -727,12 +698,15 @@ function renderShuttleTable() {
     const avgDwell = s.departures.length > 0 ? Math.round(s.departures.reduce((a,b) => a+b, 0) / s.departures.length) : 0;
     const pctColor = avgCompletion >= 90 ? '#22c55e' : avgCompletion >= 70 ? '#f97316' : '#ef4444';
 
-    const shuttle = SHUTTLES.find(sh => sh.num === s.num);
-    const gps = shuttle ? gpsPositions[shuttle.id] : null;
-    const hasGps = gps && (now - gps.ts < ACTIVE_THRESHOLD_MS);
-    const statusHtml = hasGps
-      ? '<span style="color:#22c55e;font-size:10px">Active</span>'
-      : `<span style="color:#555;font-size:10px">${s.lastSeen ? fmtAgo(now - new Date(s.lastSeen).getTime()) : 'idle'}</span>`;
+    const drv = driverByNum[s.num];
+    let statusHtml;
+    if (drv && (now - new Date(drv.updated_at).getTime()) < 5 * 60000) {
+      statusHtml = '<span style="color:#22c55e;font-size:10px">Online</span>';
+    } else if (drv && (now - new Date(drv.updated_at).getTime()) < 60 * 60000) {
+      statusHtml = '<span style="color:#f97316;font-size:10px">Away</span>';
+    } else {
+      statusHtml = `<span style="color:#555;font-size:10px">${s.lastSeen ? fmtAgo(now - new Date(s.lastSeen).getTime()) : 'offline'}</span>`;
+    }
 
     return `<tr>
       <td><div class="shuttle-cell"><div class="shuttle-badge" style="background:${color}">${s.num}</div>${s.name}</div></td>
@@ -815,18 +789,11 @@ function renderLapTable() {
 /* ═══════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════ */
-function fullRefresh() {
-  pollGPS();
-  loadSupabaseData();
-}
-
 updateRouteChip();
-pollGPS();
-loadSupabaseData();
+loadData();
 
-// GPS polls every 10s, Supabase data every 30s, route chip every 60s
-setInterval(pollGPS, GPS_POLL_MS);
-setInterval(loadSupabaseData, 30000);
+// Refresh data every 30s, route chip every 60s
+setInterval(loadData, 30000);
 setInterval(updateRouteChip, 60000);
 </script>
 </body>
