@@ -79,9 +79,10 @@
   .fleet-card {
     padding: 10px 12px; border-radius: 8px;
     background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
-    transition: border-color 0.2s;
+    transition: border-color 0.2s; min-height: 90px; display: flex; flex-direction: column;
   }
   .fleet-card.active { border-color: rgba(34,197,94,0.25); }
+  .fleet-card.away { border-color: rgba(249,115,22,0.15); opacity: 0.65; }
   .fleet-card.idle { opacity: 0.4; }
   .fleet-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .fleet-num {
@@ -375,12 +376,18 @@ function isNightMode() {
 function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
 
 function getDateRange(range) {
+  // Use CT (Central Time) midnight for date boundaries since shuttles operate in Austin
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const ctStr = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const ctNow = new Date(ctStr);
+  const midnightCT = new Date(ctNow.getFullYear(), ctNow.getMonth(), ctNow.getDate());
+  // Convert midnight CT to real UTC by applying the local↔CT offset
+  const offset = now.getTime() - ctNow.getTime();
+  const midnightUTC = new Date(midnightCT.getTime() + offset);
   switch (range) {
-    case 'today': return today.toISOString();
-    case 'yesterday': { const y = new Date(today); y.setDate(y.getDate() - 1); return y.toISOString(); }
-    case '7d': { const d = new Date(today); d.setDate(d.getDate() - 7); return d.toISOString(); }
+    case 'today': return midnightUTC.toISOString();
+    case 'yesterday': return new Date(midnightUTC.getTime() - 86400000).toISOString();
+    case '7d': return new Date(midnightUTC.getTime() - 7 * 86400000).toISOString();
     case 'all': return '2020-01-01T00:00:00Z';
   }
 }
@@ -455,9 +462,10 @@ async function loadData() {
     );
 
     const recentEvents = events.filter(e => (now - new Date(e.created_at).getTime()) < 60 * 60000).length;
+    const eventsLimitHit = events.length >= 2000;
     updateSystemDot('dotEvents', 'lblEvents',
-      recentEvents > 0 ? 'ok' : 'warn',
-      `Events: ${recentEvents} in last hour (${events.length} total)`
+      eventsLimitHit ? 'warn' : recentEvents > 0 ? 'ok' : 'warn',
+      `Events: ${recentEvents} in last hour (${events.length}${eventsLimitHit ? '+ limit' : ''} total)`
     );
   } catch (e) {
     updateSystemDot('dotDb', 'lblDb', 'err', 'Database: connection error');
@@ -532,11 +540,11 @@ function renderFleetGrid() {
       metaText = `${lastEvt.event_type} · ${fmtAgo(evtAge)}`;
     }
 
-    const isActive = status === 'online' || status === 'away';
     const tagClass = status === 'online' ? 'on' : status === 'away' ? 'away' : 'off';
     const tagLabel = status === 'online' ? 'Online' : status === 'away' ? 'Away' : 'Offline';
+    const cardClass = status === 'online' ? ' active' : status === 'away' ? ' away' : ' idle';
 
-    return `<div class="fleet-card${status === 'online' ? ' active' : ''}${!isActive ? ' idle' : ''}">
+    return `<div class="fleet-card${cardClass}">
       <div class="fleet-top">
         <div class="fleet-num" style="background:${color}">${s.num}</div>
         <span class="fleet-name">${s.name}${s.ada ? '<span class="fleet-ada">ADA</span>' : ''}</span>
@@ -545,7 +553,7 @@ function renderFleetGrid() {
         </div>
       </div>
       <div class="fleet-location">${locationText}</div>
-      ${metaText ? `<div class="fleet-meta">${metaText}</div>` : ''}
+      <div class="fleet-meta">${metaText || '&nbsp;'}</div>
     </div>`;
   }).join('');
 }
@@ -682,9 +690,14 @@ function renderShuttleTable() {
     }
   });
 
+  // Ensure all 11 shuttles appear even without events
+  SHUTTLES.forEach(s => {
+    if (!byShuttle[s.num]) byShuttle[s.num] = { name: s.name, num: s.num, arrivals: 0, skips: 0, departures: [], lastSeen: null };
+  });
   const rows = Object.values(byShuttle).sort((a, b) => a.num - b.num);
   const tbody = document.getElementById('shuttleTable');
-  document.getElementById('shuttleCount').textContent = `(${rows.length} shuttles with data)`;
+  const withData = rows.filter(r => r.arrivals > 0 || r.skips > 0).length;
+  document.getElementById('shuttleCount').textContent = `(${withData} of ${rows.length} with data)`;
 
   if (rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No event data for this period</td></tr>';
