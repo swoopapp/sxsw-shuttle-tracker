@@ -1377,129 +1377,23 @@ function startWalking() {
 
 // ── Static route traces from official SXSW shuttle map PDF ──
 // Coordinates [lng, lat] traced at every turn along the actual streets
-const DAY_ROUTE_GEO = [
-  // 3RD & CONGRESS → N on Congress
-  [-97.74468, 30.26299],
-  [-97.74278, 30.26807],
-  [-97.74236, 30.26902],
-  [-97.74105, 30.26864],
-  [-97.74076, 30.26956],
-  // PARAMOUNT → E toward Downright
-  [-97.74455, 30.27060],
-  [-97.74351, 30.27330],
-  [-97.73326, 30.27055],
-  [-97.73363, 30.26962],
-  [-97.74491, 30.27280],
-  // DOWNRIGHT → W toward Violet Crown
-  [-97.74665, 30.26808],
-  [-97.74732, 30.26624],
-  [-97.74385, 30.26527],
-  // 101 W 3RD ST
-  [-97.74420, 30.26530],
-  // → S toward Palmer
-  [-97.74620, 30.25889],
-  [-97.74677, 30.25907],
-  [-97.74981, 30.25843],
-  [-97.75335, 30.25953],
-  [-97.75468, 30.25999],
-  [-97.75454, 30.26022],
-  [-97.75409, 30.26024],
-  // PALMER circle loop
-  [-97.75384, 30.25992],
-  [-97.75336, 30.25974],
-  [-97.75333, 30.25994],
-  [-97.75354, 30.26017],
-  [-97.75379, 30.26033],
-  [-97.75411, 30.26022],
-  [-97.75440, 30.26024],
-  [-97.75467, 30.26004],
-  [-97.75571, 30.26035],
-  // → toward Zach
-  [-97.75678, 30.26057],
-  [-97.75811, 30.26079],
-  [-97.75831, 30.26120],
-  [-97.75795, 30.26213],
-  [-97.75706, 30.26445],
-  [-97.75766, 30.26471],
-  // ZACH THEATRE loop
-  [-97.75826, 30.26518],
-  [-97.75914, 30.26562],
-  [-97.75922, 30.26544],
-  [-97.75890, 30.26526],
-  [-97.75877, 30.26544],
-  [-97.75814, 30.26512],
-  [-97.75772, 30.26475],
-  [-97.75707, 30.26444],
-  // → S toward Alamo
-  [-97.75842, 30.26132],
-  [-97.75903, 30.25921],
-  [-97.75928, 30.25844],
-  [-97.76030, 30.25741],
-  [-97.76094, 30.25690],
-  [-97.76188, 30.25537],
-  // ALAMO LAMAR loop
-  [-97.76315, 30.25597],
-  [-97.76270, 30.25668],
-  [-97.76146, 30.25601],
-  [-97.76080, 30.25699],
-  [-97.75963, 30.25799],
-  [-97.75899, 30.25910],
-  [-97.75854, 30.26085],
-  // → E toward Rollins
-  [-97.75544, 30.26017],
-  [-97.75251, 30.25919],
-  [-97.75012, 30.25840],
-  [-97.74850, 30.25861],
-  // RIVIAN area
-  [-97.74677, 30.25902],
-  [-97.74621, 30.25882],
-  // → S toward Continental
-  [-97.74902, 30.25130],
-  [-97.74909, 30.25109],
-  [-97.75060, 30.25156],
-  // CONTINENTAL CLUB / SOCO loop
-  [-97.75131, 30.25054],
-  [-97.74948, 30.25000],
-  [-97.74815, 30.25357],
-  // → N back to Congress
-  [-97.74642, 30.25836],
-  [-97.74470, 30.26286],
-  [-97.74472, 30.26282],
-  // 3RD & CONGRESS (close loop)
-  [-97.74466, 30.26302],
-];
-
-// Night route: reuses day route geometry + adds East Austin extension (Downright → Shangri-La → Hotel Vegas → back)
-// Built dynamically: day route up to Downright, then hand-drawn east extension, then day route from Violet Crown onward
-const NIGHT_EAST_EXTENSION = [
-  // DOWNRIGHT → E toward Shangri-La / Hotel Vegas
-  [-97.73360, 30.27067],
-  [-97.72445, 30.26744],
-  // HOTEL VEGAS area → S loop
-  [-97.72652, 30.26304],
-  // W back toward main route
-  [-97.73417, 30.26568],
-  [-97.73248, 30.27030],
-  // → W toward Paramount / Violet Crown
-  [-97.73246, 30.27028],
-  [-97.74077, 30.27268],
-  [-97.74076, 30.27268],
-  [-97.74450, 30.27371],
-  [-97.74496, 30.27256],
-];
-
-// Stitch: day route start → Downright, then east extension, then day route from Violet Crown → end
-const _dayDownrightIdx = DAY_ROUTE_GEO.findIndex(c => Math.abs(c[0] - (-97.74385)) < 0.001 && Math.abs(c[1] - 30.26527) < 0.001);
-const _dayVioletIdx = DAY_ROUTE_GEO.findIndex(c => Math.abs(c[0] - (-97.74420)) < 0.001 && Math.abs(c[1] - 30.26530) < 0.001);
-const NIGHT_ROUTE_GEO = [
-  ...DAY_ROUTE_GEO.slice(0, _dayDownrightIdx + 1),
-  ...NIGHT_EAST_EXTENSION,
-  ...DAY_ROUTE_GEO.slice(_dayVioletIdx),
-];
-
-// ── Render route lines from static GeoJSON ──
+// ── Render route lines via Mapbox Directions API (actual roads) ──
 let lastRouteKey = null;
-function renderRouteLines() {
+let routeCache = {}; // cache fetched routes by key
+
+async function fetchRouteGeo(route) {
+  const coords = [...route, route[0]].map(key => {
+    const s = ALL_STOPS[key];
+    return `${s.lng},${s.lat}`;
+  }).join(';');
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.routes && data.routes[0]) return data.routes[0].geometry;
+  return null;
+}
+
+async function renderRouteLines() {
   const night = isNightMode();
   const route = getActiveRoute();
   const routeKey = route.join(',');
@@ -1507,11 +1401,15 @@ function renderRouteLines() {
 
   if (routeKey !== lastRouteKey) {
     lastRouteKey = routeKey;
-    const coords = night ? NIGHT_ROUTE_GEO : DAY_ROUTE_GEO;
-    const geojson = {
-      type: 'Feature',
-      geometry: { type: 'LineString', coordinates: coords }
-    };
+
+    // Fetch or use cached route geometry
+    if (!routeCache[routeKey]) {
+      routeCache[routeKey] = await fetchRouteGeo(route);
+    }
+    const geometry = routeCache[routeKey];
+    if (!geometry) return;
+
+    const geojson = { type: 'Feature', geometry };
 
     if (map.getSource('route')) {
       map.getSource('route').setData(geojson);
