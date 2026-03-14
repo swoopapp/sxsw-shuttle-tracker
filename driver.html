@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -208,6 +209,44 @@
 <script>
 mapboxgl.accessToken = '__MAPBOX_TOKEN__';
 
+// ── Supabase ──
+const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── Session ID (anonymous, persisted per device) ──
+function getSessionId() {
+  let id = localStorage.getItem('driverSessionId');
+  if (!id) {
+    id = 'drv_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('driverSessionId', id);
+  }
+  return id;
+}
+const SESSION_ID = getSessionId();
+
+async function logStatus() {
+  const route = getActiveRoute();
+  const stopKey = route[currentIdx];
+  const stop = ALL_STOPS[stopKey];
+  try {
+    await sb.from('sxsw_driver_app_status').upsert({
+      session_id: SESSION_ID,
+      current_stop_idx: currentIdx,
+      current_stop_key: stopKey,
+      current_stop_name: stop.name,
+      lap_count: lapCount,
+      route_type: isNightMode() ? 'night' : 'day',
+      last_lat: driverLat,
+      last_lng: driverLng,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'session_id' });
+  } catch (e) { /* silent */ }
+}
+
+// Heartbeat every 30s
+setInterval(logStatus, 30000);
+
 // ── Stop Data ──
 const ALL_STOPS = {
   'congress':    { name: '3rd & Congress',              lat: 30.26505, lng: -97.74374 },
@@ -297,6 +336,7 @@ map.on('load', () => {
   addStopMarkers();
   startGPS();
   updateUI();
+  logStatus();
 });
 
 // Disable tracking on user drag
@@ -508,6 +548,7 @@ function arrivedAtStop() {
     lapCount++;
   }
   save();
+  logStatus();
 
   // Reset alerts
   isApproaching = false;
