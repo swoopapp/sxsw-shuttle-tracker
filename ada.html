@@ -458,6 +458,7 @@ function renderCard(r) {
         <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
       </div>
       ${etaBanner}
+      ${r.passenger_phone ? `<div class="request-detail"><span class="label">Phone</span> <a href="tel:${esc(r.passenger_phone)}" style="color:inherit;text-decoration:underline;">${esc(r.passenger_phone)}</a></div>` : ''}
       <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}</div>
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
