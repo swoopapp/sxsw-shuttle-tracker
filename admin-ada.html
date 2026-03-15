@@ -1061,11 +1061,38 @@ async function updateShuttleMarkers() {
       const lat = coords.latitude;
       const lng = coords.longitude;
 
-      // Only update last-seen when position actually changes
-      const prev = shuttleLastCoords[num];
-      if (!prev || prev.lat !== lat || prev.lng !== lng) {
-        shuttleLastSeen[num] = new Date();
+      // Check for API-provided timestamp first
+      const apiTs = pos.properties?.ts || pos.properties?.timestamp || pos.data?.ts || pos.ts || pos.timestamp;
+      const storageKey = `shuttle_${num}_last`;
+
+      if (apiTs) {
+        // Use the API timestamp directly — this is authoritative
+        shuttleLastSeen[num] = new Date(typeof apiTs === 'number' ? apiTs : Date.parse(apiTs));
         shuttleLastCoords[num] = { lat, lng };
+        localStorage.setItem(storageKey, JSON.stringify({ lat, lng, ts: shuttleLastSeen[num].getTime() }));
+      } else {
+        // No API timestamp — use localStorage to persist across refreshes
+        if (!shuttleLastCoords[num]) {
+          // First poll after page load: restore from localStorage
+          const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
+          if (stored && stored.lat === lat && stored.lng === lng) {
+            // Position unchanged since last session — keep stored timestamp
+            shuttleLastSeen[num] = new Date(stored.ts);
+          } else {
+            // Position changed or no stored data
+            shuttleLastSeen[num] = new Date();
+            localStorage.setItem(storageKey, JSON.stringify({ lat, lng, ts: Date.now() }));
+          }
+          shuttleLastCoords[num] = { lat, lng };
+        } else {
+          // Subsequent poll — only update when position actually changes
+          const prev = shuttleLastCoords[num];
+          if (prev.lat !== lat || prev.lng !== lng) {
+            shuttleLastSeen[num] = new Date();
+            shuttleLastCoords[num] = { lat, lng };
+            localStorage.setItem(storageKey, JSON.stringify({ lat, lng, ts: Date.now() }));
+          }
+        }
       }
 
       const stale = shuttleLastSeen[num] && (Date.now() - shuttleLastSeen[num].getTime()) > SHUTTLE_STALE_MS;
