@@ -108,6 +108,8 @@
   .trip-btn.pickup:hover { background: #7c3aed; }
   .trip-btn.dropoff { background: #22c55e; color: #fff; }
   .trip-btn.dropoff:hover { background: #16a34a; }
+  .trip-btn.unclaim { background: none; border: 1px solid rgba(239,68,68,0.4); color: #ef4444; margin-top: 8px; font-size: 13px; }
+  .trip-btn.unclaim:hover { background: rgba(239,68,68,0.1); border-color: #ef4444; }
   .trip-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
 
   /* ── Active Trip Banner ── */
@@ -365,6 +367,26 @@ async function claimTrip(id) {
   document.getElementById('tabMyTrip').classList.add('active');
 }
 
+async function unclaimTrip(id) {
+  if (!confirm('Release this trip back to available?')) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'RELEASING...';
+  const req = allRequests.find(r => r.id === id);
+  const { error } = await sb.from('sxsw_ada_requests').update({
+    status: 'pending',
+    shuttle_num: null,
+    claimed_at: null,
+    eta_minutes: null,
+    eta_updated_at: null,
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('Error releasing trip.'); console.error(error); btn.disabled = false; btn.textContent = 'UNCLAIM'; return; }
+  if (req) notifySlack('ada_unclaimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
+  currentTab = 'available';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tabAvailable').classList.add('active');
+}
+
 async function markPickedUp(id) {
   const btn = event.target;
   btn.disabled = true; btn.textContent = 'UPDATING...';
@@ -478,6 +500,7 @@ function renderMyTripCard(r) {
       <div class="trip-actions">
         ${isClaimed ? `<button class="trip-btn pickup" onclick="markPickedUp('${r.id}')">PICKED UP</button>` : ''}
         ${isPickedUp ? `<button class="trip-btn dropoff" onclick="markDroppedOff('${r.id}')">DROPPED OFF</button>` : ''}
+        ${isClaimed ? `<button class="trip-btn unclaim" onclick="unclaimTrip('${r.id}')">UNCLAIM</button>` : ''}
       </div>
     </div>`;
 }

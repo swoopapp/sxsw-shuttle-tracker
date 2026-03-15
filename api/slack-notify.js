@@ -92,6 +92,15 @@ function formatSlackMessage(event_type, data) {
       return { blocks, text: `Shuttle ${data.shuttle_num} dropped off ${data.passenger_name}${tn}` };
     }
 
+    case 'ada_unclaimed': {
+      const tn = data.trip_number ? ` #${data.trip_number}` : '';
+      blocks.push(
+        section(`*Trip${tn} Released* :leftwards_arrow_with_hook:\n*Shuttle ${data.shuttle_num}* released the trip for *${data.passenger_name}* back to available`),
+        context(`Released at ${ts} CT`)
+      );
+      return { blocks, text: `Shuttle ${data.shuttle_num} released trip${tn} for ${data.passenger_name}` };
+    }
+
     case 'ada_cancelled': {
       const tn = data.trip_number ? ` #${data.trip_number}` : '';
       blocks.push(
