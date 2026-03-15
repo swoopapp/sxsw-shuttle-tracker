@@ -31,11 +31,14 @@
   .form-desc { font-size: 12px; color: #666; margin-bottom: 20px; }
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .field input, .field textarea {
+  .field input, .field textarea, .field select {
     width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
     border-radius: 8px; color: #fff; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
+    -webkit-appearance: none; appearance: none;
   }
-  .field input:focus, .field textarea:focus { border-color: rgba(59,130,246,0.5); }
+  .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+  .field select option { background: #1a1a1a; color: #fff; }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: rgba(59,130,246,0.5); }
   .field input::placeholder, .field textarea::placeholder { color: #555; }
   .field textarea { resize: vertical; min-height: 60px; }
   .field-row { display: flex; gap: 12px; }
@@ -98,12 +101,6 @@
   .eta-banner.enroute .eta-time { color: #c084fc; }
   .eta-sub { font-size: 11px; color: #888; margin-top: 4px; }
 
-  .cancel-btn {
-    margin-top: 10px; width: 100%; padding: 8px; border: 1px solid rgba(239,68,68,0.2);
-    border-radius: 6px; background: rgba(239,68,68,0.08); color: #f87171; font-size: 12px;
-    font-weight: 600; cursor: pointer; transition: all 0.15s;
-  }
-  .cancel-btn:hover { background: rgba(239,68,68,0.18); }
   .empty-state { text-align: center; padding: 40px 20px; color: #444; font-size: 13px; }
 
   @media (max-width: 640px) {
@@ -144,12 +141,46 @@
 
       <div class="field">
         <label>Pickup Location</label>
-        <input type="text" id="pickupLocation" placeholder="Address or venue name" required>
+        <select id="pickupSelect" onchange="onStopSelect('pickup')" required>
+          <option value="" disabled selected>Select a stop…</option>
+          <option value="congress">3rd &amp; Congress</option>
+          <option value="paramount">Paramount / F&amp;TV Clubhouse</option>
+          <option value="downright">Downright / Music Clubhouse</option>
+          <option value="shangrila">Shangri-La</option>
+          <option value="hotelvegas">Hotel Vegas / Low Down</option>
+          <option value="violetcrown">Violet Crown / ACL Live</option>
+          <option value="w3rd">101 W 3rd St</option>
+          <option value="palmer">Palmer Circle Drive</option>
+          <option value="zach">Zach Theatre</option>
+          <option value="alamo">Alamo Lamar</option>
+          <option value="rollins">Rollins Theater</option>
+          <option value="rivian">Rivian</option>
+          <option value="continental">Continental Club / SoCo</option>
+          <option value="custom">Custom Address</option>
+        </select>
+        <input type="text" id="pickupCustom" placeholder="Enter custom address" style="display:none;margin-top:8px;">
       </div>
 
       <div class="field">
         <label>Drop-off Location</label>
-        <input type="text" id="dropoffLocation" placeholder="Address or venue name" required>
+        <select id="dropoffSelect" onchange="onStopSelect('dropoff')" required>
+          <option value="" disabled selected>Select a stop…</option>
+          <option value="congress">3rd &amp; Congress</option>
+          <option value="paramount">Paramount / F&amp;TV Clubhouse</option>
+          <option value="downright">Downright / Music Clubhouse</option>
+          <option value="shangrila">Shangri-La</option>
+          <option value="hotelvegas">Hotel Vegas / Low Down</option>
+          <option value="violetcrown">Violet Crown / ACL Live</option>
+          <option value="w3rd">101 W 3rd St</option>
+          <option value="palmer">Palmer Circle Drive</option>
+          <option value="zach">Zach Theatre</option>
+          <option value="alamo">Alamo Lamar</option>
+          <option value="rollins">Rollins Theater</option>
+          <option value="rivian">Rivian</option>
+          <option value="continental">Continental Club / SoCo</option>
+          <option value="custom">Custom Address</option>
+        </select>
+        <input type="text" id="dropoffCustom" placeholder="Enter custom address" style="display:none;margin-top:8px;">
       </div>
 
       <div class="field">
@@ -185,6 +216,36 @@
 const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STOPS = {
+  congress:    { name: '3rd & Congress',             lat: 30.26505, lng: -97.74374 },
+  paramount:   { name: 'Paramount / F&TV Clubhouse', lat: 30.26992, lng: -97.74190 },
+  downright:   { name: 'Downright / Music Clubhouse',lat: 30.27114, lng: -97.73568 },
+  shangrila:   { name: 'Shangri-La',                 lat: 30.26499, lng: -97.73198 },
+  hotelvegas:  { name: 'Hotel Vegas / Low Down',     lat: 30.26357, lng: -97.72785 },
+  violetcrown: { name: 'Violet Crown / ACL Live',    lat: 30.26576, lng: -97.74597 },
+  w3rd:        { name: '101 W 3rd St',               lat: 30.26530, lng: -97.74420 },
+  palmer:      { name: 'Palmer Circle Drive',        lat: 30.26017, lng: -97.75345 },
+  zach:        { name: 'Zach Theatre',               lat: 30.26492, lng: -97.75797 },
+  alamo:       { name: 'Alamo Lamar',                lat: 30.25628, lng: -97.76151 },
+  rollins:     { name: 'Rollins Theater',            lat: 30.25964, lng: -97.75392 },
+  rivian:      { name: 'Rivian',                     lat: 30.25977, lng: -97.74622 },
+  continental: { name: 'Continental Club / SoCo',    lat: 30.25044, lng: -97.74922 },
+};
+
+function onStopSelect(field) {
+  const sel = document.getElementById(field + 'Select');
+  const custom = document.getElementById(field + 'Custom');
+  if (sel.value === 'custom') {
+    custom.style.display = 'block';
+    custom.required = true;
+    custom.focus();
+  } else {
+    custom.style.display = 'none';
+    custom.required = false;
+    custom.value = '';
+  }
+}
 
 let allRequests = [];
 
@@ -242,11 +303,28 @@ async function submitRequest(e) {
   const ctOffset = getCTOffset();
   const pickupUTC = new Date(pickupTime.getTime() - ctOffset);
 
+  const pickupVal = document.getElementById('pickupSelect').value;
+  const dropoffVal = document.getElementById('dropoffSelect').value;
+  const pickupStop = STOPS[pickupVal];
+  const dropoffStop = STOPS[dropoffVal];
+  const pickupLocation = pickupStop ? pickupStop.name : document.getElementById('pickupCustom').value.trim();
+  const dropoffLocation = dropoffStop ? dropoffStop.name : document.getElementById('dropoffCustom').value.trim();
+
+  if (!pickupLocation || !dropoffLocation) {
+    alert('Please enter a custom address.');
+    btn.disabled = false; btn.textContent = 'Submit Request';
+    return;
+  }
+
   const record = {
     passenger_name: document.getElementById('passengerName').value.trim(),
     passenger_phone: document.getElementById('passengerPhone').value.trim(),
-    pickup_location: document.getElementById('pickupLocation').value.trim(),
-    dropoff_location: document.getElementById('dropoffLocation').value.trim(),
+    pickup_location: pickupLocation,
+    dropoff_location: dropoffLocation,
+    pickup_lat: pickupStop ? pickupStop.lat : null,
+    pickup_lng: pickupStop ? pickupStop.lng : null,
+    dropoff_lat: dropoffStop ? dropoffStop.lat : null,
+    dropoff_lng: dropoffStop ? dropoffStop.lng : null,
     pickup_time: pickupUTC.toISOString(),
     notes: document.getElementById('notes').value.trim() || null,
     status: 'pending'
@@ -262,8 +340,8 @@ async function submitRequest(e) {
   if (row) {
     notifySlack('ada_new_request', {
       passenger_name: record.passenger_name,
-      pickup_location: record.pickup_location,
-      dropoff_location: record.dropoff_location,
+      pickup_location: pickupLocation,
+      dropoff_location: dropoffLocation,
       pickup_time: document.getElementById('pickupTime').value,
       notes: record.notes,
       trip_number: row.trip_number
@@ -339,7 +417,6 @@ function renderCard(r) {
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.status === 'pending' ? `<button class="cancel-btn" onclick="cancelRequest('${r.id}')">Cancel Request</button>` : ''}
     </div>`;
 }
 
@@ -352,18 +429,6 @@ function formatTime(iso) {
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
-}
-
-async function cancelRequest(id) {
-  if (!confirm('Cancel this request?')) return;
-  const req = allRequests.find(r => r.id === id);
-  const { error } = await sb.from('sxsw_ada_requests').update({
-    status: 'cancelled',
-    cancelled_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }).eq('id', id);
-  if (error) { alert('Error cancelling.'); console.error(error); return; }
-  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
 }
 
 async function notifySlack(event_type, data) {

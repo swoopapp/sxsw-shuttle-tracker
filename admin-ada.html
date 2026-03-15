@@ -102,7 +102,10 @@
   .modal .field input, .modal .field textarea, .modal .field select {
     width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
     border-radius: 8px; color: #fff; font-size: 14px; font-family: inherit; outline: none;
+    -webkit-appearance: none; appearance: none;
   }
+  .modal .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+  .modal .field select option { background: #1a1a1a; color: #fff; }
   .modal .field textarea { resize: vertical; min-height: 60px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
   .modal-btn {
@@ -175,8 +178,8 @@
 
   <!-- Filter Bar -->
   <div class="filter-bar">
-    <button class="filter-btn" onclick="setFilter('all')">All</button>
-    <button class="filter-btn active" onclick="setFilter('pending')">Pending</button>
+    <button class="filter-btn active" onclick="setFilter('all')">All</button>
+    <button class="filter-btn" onclick="setFilter('pending')">Pending</button>
     <button class="filter-btn" onclick="setFilter('in_progress')">In Progress</button>
     <button class="filter-btn" onclick="setFilter('completed')">Completed</button>
     <button class="filter-btn" onclick="setFilter('cancelled')">Cancelled</button>
@@ -205,8 +208,24 @@
     </div>
     <div class="field">
       <label>Pickup Location <span class="geocoded-tag" id="pickupGeoTag" style="display:none">Geocoded</span></label>
-      <div class="autocomplete-wrap">
-        <input type="text" id="editPickup" autocomplete="off" oninput="onAddressInput('pickup')">
+      <select id="editPickupSelect" onchange="onAdminStopSelect('pickup')">
+        <option value="congress">3rd &amp; Congress</option>
+        <option value="paramount">Paramount / F&amp;TV Clubhouse</option>
+        <option value="downright">Downright / Music Clubhouse</option>
+        <option value="shangrila">Shangri-La</option>
+        <option value="hotelvegas">Hotel Vegas / Low Down</option>
+        <option value="violetcrown">Violet Crown / ACL Live</option>
+        <option value="w3rd">101 W 3rd St</option>
+        <option value="palmer">Palmer Circle Drive</option>
+        <option value="zach">Zach Theatre</option>
+        <option value="alamo">Alamo Lamar</option>
+        <option value="rollins">Rollins Theater</option>
+        <option value="rivian">Rivian</option>
+        <option value="continental">Continental Club / SoCo</option>
+        <option value="custom">Custom Address</option>
+      </select>
+      <div class="autocomplete-wrap" id="pickupCustomWrap" style="display:none;margin-top:8px;">
+        <input type="text" id="editPickup" autocomplete="off" placeholder="Enter address" oninput="onAddressInput('pickup')">
         <input type="hidden" id="editPickupLat">
         <input type="hidden" id="editPickupLng">
         <div class="autocomplete-list" id="pickupSuggestions"></div>
@@ -214,8 +233,24 @@
     </div>
     <div class="field">
       <label>Drop-off Location <span class="geocoded-tag" id="dropoffGeoTag" style="display:none">Geocoded</span></label>
-      <div class="autocomplete-wrap">
-        <input type="text" id="editDropoff" autocomplete="off" oninput="onAddressInput('dropoff')">
+      <select id="editDropoffSelect" onchange="onAdminStopSelect('dropoff')">
+        <option value="congress">3rd &amp; Congress</option>
+        <option value="paramount">Paramount / F&amp;TV Clubhouse</option>
+        <option value="downright">Downright / Music Clubhouse</option>
+        <option value="shangrila">Shangri-La</option>
+        <option value="hotelvegas">Hotel Vegas / Low Down</option>
+        <option value="violetcrown">Violet Crown / ACL Live</option>
+        <option value="w3rd">101 W 3rd St</option>
+        <option value="palmer">Palmer Circle Drive</option>
+        <option value="zach">Zach Theatre</option>
+        <option value="alamo">Alamo Lamar</option>
+        <option value="rollins">Rollins Theater</option>
+        <option value="rivian">Rivian</option>
+        <option value="continental">Continental Club / SoCo</option>
+        <option value="custom">Custom Address</option>
+      </select>
+      <div class="autocomplete-wrap" id="dropoffCustomWrap" style="display:none;margin-top:8px;">
+        <input type="text" id="editDropoff" autocomplete="off" placeholder="Enter address" oninput="onAddressInput('dropoff')">
         <input type="hidden" id="editDropoffLat">
         <input type="hidden" id="editDropoffLng">
         <div class="autocomplete-list" id="dropoffSuggestions"></div>
@@ -251,16 +286,61 @@ const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const STOPS = {
+  congress:    { name: '3rd & Congress',             lat: 30.26505, lng: -97.74374 },
+  paramount:   { name: 'Paramount / F&TV Clubhouse', lat: 30.26992, lng: -97.74190 },
+  downright:   { name: 'Downright / Music Clubhouse',lat: 30.27114, lng: -97.73568 },
+  shangrila:   { name: 'Shangri-La',                 lat: 30.26499, lng: -97.73198 },
+  hotelvegas:  { name: 'Hotel Vegas / Low Down',     lat: 30.26357, lng: -97.72785 },
+  violetcrown: { name: 'Violet Crown / ACL Live',    lat: 30.26576, lng: -97.74597 },
+  w3rd:        { name: '101 W 3rd St',               lat: 30.26530, lng: -97.74420 },
+  palmer:      { name: 'Palmer Circle Drive',        lat: 30.26017, lng: -97.75345 },
+  zach:        { name: 'Zach Theatre',               lat: 30.26492, lng: -97.75797 },
+  alamo:       { name: 'Alamo Lamar',                lat: 30.25628, lng: -97.76151 },
+  rollins:     { name: 'Rollins Theater',            lat: 30.25964, lng: -97.75392 },
+  rivian:      { name: 'Rivian',                     lat: 30.25977, lng: -97.74622 },
+  continental: { name: 'Continental Club / SoCo',    lat: 30.25044, lng: -97.74922 },
+};
+
+// Reverse-lookup: find stop key by location name
+function findStopKey(locationName) {
+  if (!locationName) return null;
+  for (const [key, stop] of Object.entries(STOPS)) {
+    if (stop.name === locationName) return key;
+  }
+  return null;
+}
+
+function onAdminStopSelect(field) {
+  const sel = document.getElementById('edit' + (field === 'pickup' ? 'Pickup' : 'Dropoff') + 'Select');
+  const wrap = document.getElementById(field + 'CustomWrap');
+  const latEl = document.getElementById(field === 'pickup' ? 'editPickupLat' : 'editDropoffLat');
+  const lngEl = document.getElementById(field === 'pickup' ? 'editPickupLng' : 'editDropoffLng');
+  const geoTag = document.getElementById(field + 'GeoTag');
+
+  if (sel.value === 'custom') {
+    wrap.style.display = 'block';
+    latEl.value = '';
+    lngEl.value = '';
+    geoTag.style.display = 'none';
+  } else {
+    wrap.style.display = 'none';
+    const stop = STOPS[sel.value];
+    if (stop) {
+      latEl.value = stop.lat;
+      lngEl.value = stop.lng;
+      geoTag.style.display = 'inline';
+    }
+  }
+}
+
 let allRequests = [];
-let currentFilter = 'pending';
+let currentFilter = 'all';
 
 /* ── Init ── */
 (async function init() {
   await loadRequests();
   subscribeRealtime();
-  // Start ETA polling AFTER data is loaded
-  updateAllEtas();
-  setInterval(updateAllEtas, ETA_POLL_MS);
 })();
 
 /* ── Load ── */
@@ -372,14 +452,45 @@ function openEdit(id) {
   document.getElementById('editId').value = r.id;
   document.getElementById('editName').value = r.passenger_name;
   document.getElementById('editPhone').value = r.passenger_phone;
-  document.getElementById('editPickup').value = r.pickup_location;
-  document.getElementById('editPickupLat').value = r.pickup_lat || '';
-  document.getElementById('editPickupLng').value = r.pickup_lng || '';
-  document.getElementById('editDropoff').value = r.dropoff_location;
-  document.getElementById('editDropoffLat').value = r.dropoff_lat || '';
-  document.getElementById('editDropoffLng').value = r.dropoff_lng || '';
-  document.getElementById('pickupGeoTag').style.display = r.pickup_lat ? 'inline' : 'none';
-  document.getElementById('dropoffGeoTag').style.display = r.dropoff_lat ? 'inline' : 'none';
+  // Set pickup dropdown or custom
+  const pickupKey = findStopKey(r.pickup_location);
+  const pickupSel = document.getElementById('editPickupSelect');
+  const pickupWrap = document.getElementById('pickupCustomWrap');
+  if (pickupKey) {
+    pickupSel.value = pickupKey;
+    pickupWrap.style.display = 'none';
+    document.getElementById('editPickup').value = '';
+    document.getElementById('editPickupLat').value = STOPS[pickupKey].lat;
+    document.getElementById('editPickupLng').value = STOPS[pickupKey].lng;
+    document.getElementById('pickupGeoTag').style.display = 'inline';
+  } else {
+    pickupSel.value = 'custom';
+    pickupWrap.style.display = 'block';
+    document.getElementById('editPickup').value = r.pickup_location;
+    document.getElementById('editPickupLat').value = r.pickup_lat || '';
+    document.getElementById('editPickupLng').value = r.pickup_lng || '';
+    document.getElementById('pickupGeoTag').style.display = r.pickup_lat ? 'inline' : 'none';
+  }
+
+  // Set dropoff dropdown or custom
+  const dropoffKey = findStopKey(r.dropoff_location);
+  const dropoffSel = document.getElementById('editDropoffSelect');
+  const dropoffWrap = document.getElementById('dropoffCustomWrap');
+  if (dropoffKey) {
+    dropoffSel.value = dropoffKey;
+    dropoffWrap.style.display = 'none';
+    document.getElementById('editDropoff').value = '';
+    document.getElementById('editDropoffLat').value = STOPS[dropoffKey].lat;
+    document.getElementById('editDropoffLng').value = STOPS[dropoffKey].lng;
+    document.getElementById('dropoffGeoTag').style.display = 'inline';
+  } else {
+    dropoffSel.value = 'custom';
+    dropoffWrap.style.display = 'block';
+    document.getElementById('editDropoff').value = r.dropoff_location;
+    document.getElementById('editDropoffLat').value = r.dropoff_lat || '';
+    document.getElementById('editDropoffLng').value = r.dropoff_lng || '';
+    document.getElementById('dropoffGeoTag').style.display = r.dropoff_lat ? 'inline' : 'none';
+  }
   document.getElementById('editStatus').value = r.status;
   document.getElementById('editNotes').value = r.notes || '';
 
@@ -405,16 +516,26 @@ async function saveEdit() {
 
   const newStatus = document.getElementById('editStatus').value;
   const oldReq = allRequests.find(r => r.id === id);
-  const pickupLat = parseFloat(document.getElementById('editPickupLat').value) || null;
-  const pickupLng = parseFloat(document.getElementById('editPickupLng').value) || null;
-  const dropoffLat = parseFloat(document.getElementById('editDropoffLat').value) || null;
-  const dropoffLng = parseFloat(document.getElementById('editDropoffLng').value) || null;
+
+  // Resolve pickup
+  const pickupSelVal = document.getElementById('editPickupSelect').value;
+  const pickupStop = STOPS[pickupSelVal];
+  const pickupLocation = pickupStop ? pickupStop.name : document.getElementById('editPickup').value.trim();
+  const pickupLat = pickupStop ? pickupStop.lat : (parseFloat(document.getElementById('editPickupLat').value) || null);
+  const pickupLng = pickupStop ? pickupStop.lng : (parseFloat(document.getElementById('editPickupLng').value) || null);
+
+  // Resolve dropoff
+  const dropoffSelVal = document.getElementById('editDropoffSelect').value;
+  const dropoffStop = STOPS[dropoffSelVal];
+  const dropoffLocation = dropoffStop ? dropoffStop.name : document.getElementById('editDropoff').value.trim();
+  const dropoffLat = dropoffStop ? dropoffStop.lat : (parseFloat(document.getElementById('editDropoffLat').value) || null);
+  const dropoffLng = dropoffStop ? dropoffStop.lng : (parseFloat(document.getElementById('editDropoffLng').value) || null);
 
   const updates = {
     passenger_name: document.getElementById('editName').value.trim(),
     passenger_phone: document.getElementById('editPhone').value.trim(),
-    pickup_location: document.getElementById('editPickup').value.trim(),
-    dropoff_location: document.getElementById('editDropoff').value.trim(),
+    pickup_location: pickupLocation,
+    dropoff_location: dropoffLocation,
     pickup_lat: pickupLat,
     pickup_lng: pickupLng,
     dropoff_lat: dropoffLat,
@@ -487,7 +608,7 @@ function notifySlack(event_type, data) {
 }
 
 /* ── Mapbox Autocomplete ── */
-const MAPBOX_TOKEN = '__MAPBOX_TOKEN__';
+const MAPBOX_TOKEN = '';
 let acDebounce = {};
 
 function onAddressInput(field) {
@@ -556,14 +677,18 @@ const MAPSINDOORS_SOLUTION = '6b2dab7ddae2420da0b707dd';
 const SHUTTLE_MI_IDS = { 1: 'e9525829c53340b4b6bcf62e', 2: '3fbe7b87b2514cf88dd2959b' };
 const ETA_POLL_MS = 2 * 60 * 1000; // 2 minutes
 
+// Start ETA polling on load
+(function startEtaPolling() {
+  updateAllEtas();
+  setInterval(updateAllEtas, ETA_POLL_MS);
+})();
+
 async function updateAllEtas() {
   // Find all claimed/picked_up trips with geocoded pickup coordinates
   const activeTrips = allRequests.filter(r =>
     ['claimed', 'picked_up'].includes(r.status) && r.shuttle_num && r.pickup_lat && r.pickup_lng
   );
-  if (!activeTrips.length) { console.log('[ETA] No active trips with coordinates'); return; }
-
-  console.log('[ETA] Calculating for', activeTrips.length, 'trip(s)');
+  if (!activeTrips.length) return;
 
   // Group trips by shuttle to minimize MapsIndoors calls
   const byShuttle = {};
@@ -574,7 +699,7 @@ async function updateAllEtas() {
 
   for (const [shuttleNum, trips] of Object.entries(byShuttle)) {
     const miId = SHUTTLE_MI_IDS[shuttleNum];
-    if (!miId) { console.warn('[ETA] No MapsIndoors ID for shuttle', shuttleNum); continue; }
+    if (!miId) continue;
 
     try {
       // Get shuttle GPS from MapsIndoors
@@ -585,17 +710,14 @@ async function updateAllEtas() {
         body: JSON.stringify({ topics: [topic] })
       });
       const data = await res.json();
-      console.log('[ETA] MapsIndoors response for shuttle', shuttleNum, ':', JSON.stringify(data).slice(0, 200));
-
-      if (!data || !data.length) { console.warn('[ETA] No GPS data from MapsIndoors for shuttle', shuttleNum); continue; }
+      if (!data || !data.length) continue;
 
       const pos = data[0];
       const coords = pos.data?.coordinates || pos.coordinates;
-      if (!coords || !coords.latitude || !coords.longitude) { console.warn('[ETA] No coordinates in response for shuttle', shuttleNum, pos); continue; }
+      if (!coords || !coords.latitude || !coords.longitude) continue;
 
       const driverLat = coords.latitude;
       const driverLng = coords.longitude;
-      console.log('[ETA] Shuttle', shuttleNum, 'at', driverLat, driverLng);
 
       // Calculate ETA for each trip on this shuttle
       for (const trip of trips) {
@@ -603,18 +725,17 @@ async function updateAllEtas() {
           const dirUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLng},${driverLat};${trip.pickup_lng},${trip.pickup_lat}?access_token=${MAPBOX_TOKEN}`;
           const dirRes = await fetch(dirUrl);
           const dirData = await dirRes.json();
-          if (!dirData.routes || !dirData.routes.length) { console.warn('[ETA] No route found for trip', trip.trip_number); continue; }
+          if (!dirData.routes || !dirData.routes.length) continue;
 
           const etaMinutes = Math.max(1, Math.round(dirData.routes[0].duration / 60));
-          console.log('[ETA] Trip #' + trip.trip_number + ': ' + etaMinutes + ' min');
 
           await sb.from('sxsw_ada_requests').update({
             eta_minutes: etaMinutes,
             eta_updated_at: new Date().toISOString()
           }).eq('id', trip.id);
-        } catch (e) { console.error('[ETA] Directions error for trip', trip.trip_number, e); }
+        } catch (e) { console.error('Directions error for trip', trip.trip_number, e); }
       }
-    } catch (e) { console.error('[ETA] MapsIndoors error for shuttle', shuttleNum, e); }
+    } catch (e) { console.error('MapsIndoors error for shuttle', shuttleNum, e); }
   }
 }
 </script>
