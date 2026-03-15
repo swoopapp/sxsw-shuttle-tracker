@@ -250,6 +250,13 @@
   .leaflet-popup-content .popup-trip { font-weight: 700; color: #6366f1; font-size: 13px; }
   .leaflet-popup-content .popup-addr { color: #ccc; margin-top: 2px; }
   .leaflet-popup-content .popup-time { color: #888; font-size: 11px; margin-top: 4px; }
+  .shuttle-marker-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #10b981; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    font-size: 13px; font-weight: 800; color: #fff;
+  }
+  .shuttle-marker-icon.s2 { background: #f59e0b; }
 
   /* ── Last updated ── */
   .last-updated { font-size: 10px; color: #444; text-align: right; margin-bottom: 16px; }
@@ -940,7 +947,9 @@ function isStaleEta(r) {
 /* ── Map ── */
 let map = null;
 let mapMarkers = [];
+let shuttleMarkers = {};
 let mapVisible = false;
+let shuttlePollInterval = null;
 
 const STATUS_MARKER_COLORS = {
   pending: '#facc15',
@@ -963,9 +972,11 @@ function toggleMap() {
         maxZoom: 19
       }).addTo(map);
     }
-    setTimeout(() => { map.invalidateSize(); renderMap(); }, 50);
+    setTimeout(() => { map.invalidateSize(); renderMap(); updateShuttleMarkers(); }, 50);
+    if (!shuttlePollInterval) shuttlePollInterval = setInterval(updateShuttleMarkers, 30000);
   } else {
     mapEl.style.display = 'none';
+    if (shuttlePollInterval) { clearInterval(shuttlePollInterval); shuttlePollInterval = null; }
   }
 }
 
@@ -1009,6 +1020,49 @@ function renderMap() {
     map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
   } else if (bounds.length === 1) {
     map.setView(bounds[0], 15);
+  }
+}
+
+/* ── Shuttle GPS Markers ── */
+function createShuttleIcon(num) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="shuttle-marker-icon${num === 2 ? ' s2' : ''}">${num}</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18]
+  });
+}
+
+async function updateShuttleMarkers() {
+  if (!map || !mapVisible) return;
+  for (const [numStr, miId] of Object.entries(SHUTTLE_MI_IDS)) {
+    const num = parseInt(numStr);
+    try {
+      const topic = `${MAPSINDOORS_SOLUTION}/+/+/+/+/${miId}/position`;
+      const res = await fetch(MAPSINDOORS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: [topic] })
+      });
+      const data = await res.json();
+      if (!data || !data.length) continue;
+
+      const pos = data[0];
+      const coords = pos.properties?.coordinates || pos.data?.coordinates || pos.coordinates;
+      if (!coords || !coords.latitude || !coords.longitude) continue;
+
+      const lat = coords.latitude;
+      const lng = coords.longitude;
+
+      if (shuttleMarkers[num]) {
+        shuttleMarkers[num].setLatLng([lat, lng]);
+      } else {
+        shuttleMarkers[num] = L.marker([lat, lng], { icon: createShuttleIcon(num), zIndexOffset: 1000 })
+          .bindPopup(`<div class="popup-trip">Shuttle ${num}</div><div class="popup-time">Live GPS position</div>`)
+          .addTo(map);
+      }
+    } catch (e) { console.error('Shuttle GPS error for shuttle', num, e); }
   }
 }
 
