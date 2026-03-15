@@ -307,6 +307,8 @@ let allRequests = [];
 
   await loadRequests();
   subscribeRealtime();
+  // Periodic refresh to catch ETA updates that realtime may miss
+  setInterval(loadRequests, 15000);
 })();
 
 /* ── Load requests ── */

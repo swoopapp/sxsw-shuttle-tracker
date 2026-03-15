@@ -119,6 +119,25 @@
 
   .empty-state { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
 
+  /* ── Refresh bar ── */
+  .refresh-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; padding: 0 2px;
+  }
+  .last-updated { font-size: 11px; color: #555; }
+  .refresh-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.1); color: #60a5fa; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: rgba(59,130,246,0.2); border-color: #3b82f6; }
+  .refresh-btn:active { transform: scale(0.96); }
+  .refresh-btn.refreshing { opacity: 0.5; pointer-events: none; }
+  .refresh-icon { display: inline-block; transition: transform 0.4s; }
+  .refresh-btn.refreshing .refresh-icon { animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ── Connection dot ── */
   .conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
   .conn-dot.on { background: #22c55e; }
@@ -185,6 +204,7 @@ let shuttleNum = null;
 let allRequests = [];
 let currentTab = 'available';
 let etaInterval = null;
+let lastUpdatedAt = null;
 
 /* ── Init ── */
 (function init() {
@@ -215,6 +235,11 @@ async function showApp() {
   await loadRequests();
   subscribeRealtime();
   startEtaPolling();
+  // Keep "Updated Xs ago" label fresh
+  setInterval(() => {
+    const el = document.querySelector('.last-updated');
+    if (el) el.textContent = 'Updated ' + formatLastUpdated();
+  }, 5000);
 }
 
 /* ── ETA Polling ── */
@@ -289,6 +314,7 @@ async function loadRequests() {
     .order('created_at', { ascending: false });
   if (error) { console.error('Load error:', error); return; }
   allRequests = data || [];
+  lastUpdatedAt = new Date();
   render();
 }
 
@@ -304,6 +330,7 @@ function subscribeRealtime() {
       } else if (payload.eventType === 'DELETE') {
         allRequests = allRequests.filter(r => r.id !== payload.old.id);
       }
+      lastUpdatedAt = new Date();
       render();
     })
     .subscribe((status) => {
@@ -392,7 +419,14 @@ function render() {
           <div style="font-size:13px;color:#ccc;">Trip #${t.trip_number || '—'}: ${esc(t.passenger_name)} — ${esc(t.pickup_location)} → ${esc(t.dropoff_location)}</div>
         </div>`;
     }
-    area.innerHTML = banner + (available.length
+    const refreshBar = `
+      <div class="refresh-bar">
+        <span class="last-updated">Updated ${formatLastUpdated()}</span>
+        <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+          <span class="refresh-icon">↻</span> Refresh
+        </button>
+      </div>`;
+    area.innerHTML = banner + refreshBar + (available.length
       ? available.map(r => renderAvailableCard(r)).join('')
       : '<div class="empty-state">No pending requests right now</div>');
   } else if (currentTab === 'mytrip') {
@@ -478,6 +512,23 @@ function formatDateTime(iso) {
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) { btn.classList.add('refreshing'); }
+  await loadRequests();
+  if (btn) { btn.classList.remove('refreshing'); }
+}
+
+function formatLastUpdated() {
+  if (!lastUpdatedAt) return 'just now';
+  const now = new Date();
+  const diffSec = Math.round((now - lastUpdatedAt) / 1000);
+  if (diffSec < 5) return 'just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  return `${diffMin}m ago`;
 }
 
 function isStaleEta(r) {
