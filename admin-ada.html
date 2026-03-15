@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SXSW ADA Admin Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
@@ -234,6 +236,21 @@
     width: 8px; height: 8px; border-radius: 50%; pointer-events: none;
   }
 
+  /* ── Map ── */
+  #map { height: 280px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06); }
+  .map-toggle {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+    font-size: 12px; font-weight: 600; color: #777; cursor: pointer; background: none; border: none;
+  }
+  .map-toggle:hover { color: #fff; }
+  .map-toggle svg { width: 16px; height: 16px; }
+  .leaflet-popup-content-wrapper { background: #1a1a1a; color: #e0e0e0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .leaflet-popup-tip { background: #1a1a1a; }
+  .leaflet-popup-content { margin: 10px 14px; font-size: 12px; line-height: 1.5; }
+  .leaflet-popup-content .popup-trip { font-weight: 700; color: #6366f1; font-size: 13px; }
+  .leaflet-popup-content .popup-addr { color: #ccc; margin-top: 2px; }
+  .leaflet-popup-content .popup-time { color: #888; font-size: 11px; margin-top: 4px; }
+
   /* ── Last updated ── */
   .last-updated { font-size: 10px; color: #444; text-align: right; margin-bottom: 16px; }
 
@@ -280,6 +297,13 @@
     <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled', this)">Cancelled <span class="filter-count" id="fcCancelled">0</span></button>
     <button class="filter-btn" data-filter="all" onclick="setFilter('all', this)">All <span class="filter-count" id="fcAll">0</span></button>
   </div>
+
+  <!-- Map -->
+  <button class="map-toggle" id="mapToggle" onclick="toggleMap()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16M16 6v16"/></svg>
+    <span id="mapToggleLabel">Show Map</span>
+  </button>
+  <div id="map" style="display:none;"></div>
 
   <!-- Last updated -->
   <div class="last-updated" id="lastUpdated"></div>
@@ -574,6 +598,7 @@ function render() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         <div>No requests matching this filter</div>
        </div>`;
+  renderMap();
 }
 
 function renderCard(r) {
@@ -910,6 +935,81 @@ document.addEventListener('click', (e) => {
 function isStaleEta(r) {
   if (!r.eta_updated_at) return true;
   return (Date.now() - new Date(r.eta_updated_at).getTime()) > 5 * 60 * 1000;
+}
+
+/* ── Map ── */
+let map = null;
+let mapMarkers = [];
+let mapVisible = false;
+
+const STATUS_MARKER_COLORS = {
+  pending: '#facc15',
+  claimed: '#60a5fa',
+  picked_up: '#c084fc',
+  dropped_off: '#22c55e',
+  cancelled: '#ef4444'
+};
+
+function toggleMap() {
+  mapVisible = !mapVisible;
+  const mapEl = document.getElementById('map');
+  document.getElementById('mapToggleLabel').textContent = mapVisible ? 'Hide Map' : 'Show Map';
+  if (mapVisible) {
+    mapEl.style.display = 'block';
+    if (!map) {
+      map = L.map('map').setView([30.263, -97.744], 14);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19
+      }).addTo(map);
+    }
+    setTimeout(() => { map.invalidateSize(); renderMap(); }, 50);
+  } else {
+    mapEl.style.display = 'none';
+  }
+}
+
+function createMarkerIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="24" height="34" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 22 12 22s12-13 12-22C24 5.4 18.6 0 12 0z" fill="${color}" fill-opacity="0.9"/>
+      <circle cx="12" cy="12" r="5" fill="#1a1a1a" fill-opacity="0.6"/>
+    </svg>`,
+    iconSize: [24, 34],
+    iconAnchor: [12, 34],
+    popupAnchor: [0, -30]
+  });
+}
+
+function renderMap() {
+  if (!map || !mapVisible) return;
+  mapMarkers.forEach(m => map.removeLayer(m));
+  mapMarkers = [];
+
+  const filtered = getFiltered();
+  const withCoords = filtered.filter(r => r.pickup_lat && r.pickup_lng);
+  if (!withCoords.length) return;
+
+  const bounds = [];
+  for (const r of withCoords) {
+    const color = STATUS_MARKER_COLORS[r.status] || '#888';
+    const marker = L.marker([r.pickup_lat, r.pickup_lng], { icon: createMarkerIcon(color) })
+      .bindPopup(`
+        <div class="popup-trip">#${r.trip_number || '—'} — ${esc(r.passenger_name)}</div>
+        <div class="popup-addr">${esc(r.pickup_location)}</div>
+        <div class="popup-time">${relativeTime(r.created_at)}</div>
+      `)
+      .addTo(map);
+    mapMarkers.push(marker);
+    bounds.push([r.pickup_lat, r.pickup_lng]);
+  }
+
+  if (bounds.length > 1) {
+    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  } else if (bounds.length === 1) {
+    map.setView(bounds[0], 15);
+  }
 }
 
 /* ── ETA Calculation (runs from admin dashboard) ── */
