@@ -21,69 +21,157 @@
   .ada-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(59,130,246,0.15); color: #60a5fa; }
   .nav-link { color: #6366f1; font-size: 11px; text-decoration: none; }
   .nav-link:hover { color: #a5b4fc; }
-  .filter-btn {
-    padding: 5px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
-    background: rgba(255,255,255,0.03); color: #777; font-size: 11px; font-weight: 500;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .filter-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .filter-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+
+  /* ── Connection indicator ── */
+  .conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .conn-dot.on { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+  .conn-dot.off { background: #ef4444; }
+  .conn-label { font-size: 10px; color: #555; }
 
   /* ── Container ── */
   .container { max-width: 960px; margin: 0 auto; padding: 20px 24px; }
 
   /* ── Stats Row ── */
-  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
   .stat-card {
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px; padding: 14px 16px; text-align: center;
+    border-radius: 12px; padding: 16px; text-align: center; transition: border-color 0.2s;
   }
-  .stat-val { font-size: 24px; font-weight: 700; color: #fff; }
-  .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .stat-card:hover { border-color: rgba(255,255,255,0.12); }
+  .stat-val { font-size: 28px; font-weight: 800; color: #fff; line-height: 1.2; }
+  .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
   .stat-val.pending { color: #facc15; }
   .stat-val.active { color: #60a5fa; }
   .stat-val.done { color: #22c55e; }
+  .stat-card.has-pending { border-color: rgba(250,204,21,0.3); background: rgba(250,204,21,0.04); }
 
   /* ── Filter Bar ── */
-  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-btn {
+    padding: 8px 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+    background: rgba(255,255,255,0.03); color: #777; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+  }
+  .filter-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .filter-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+  .filter-count {
+    font-size: 10px; font-weight: 700; background: rgba(255,255,255,0.1); padding: 1px 6px;
+    border-radius: 10px; min-width: 18px; text-align: center;
+  }
+  .filter-btn.active .filter-count { background: rgba(99,102,241,0.3); }
 
   /* ── Section ── */
-  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
   .section-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
   .section-count { font-size: 11px; color: #555; }
 
   /* ── Request Cards ── */
   .request-card {
     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; transition: border-color 0.15s;
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 12px; transition: border-color 0.15s;
+    border-left: 4px solid transparent;
   }
   .request-card:hover { border-color: rgba(255,255,255,0.12); }
-  .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .request-name { font-size: 14px; font-weight: 600; color: #fff; }
-  .trip-num { font-size: 11px; font-weight: 700; color: #6366f1; margin-right: 6px; }
+  .request-card.status-pending { border-left-color: #facc15; }
+  .request-card.status-claimed { border-left-color: #60a5fa; }
+  .request-card.status-picked_up { border-left-color: #c084fc; }
+  .request-card.status-dropped_off { border-left-color: #22c55e; }
+  .request-card.status-cancelled { border-left-color: #ef4444; opacity: 0.6; }
+  .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .request-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .trip-num { font-size: 12px; font-weight: 700; color: #6366f1; margin-right: 8px; background: rgba(99,102,241,0.1); padding: 2px 8px; border-radius: 4px; }
   .request-phone { font-size: 12px; color: #888; margin-left: 8px; }
   .status-badge {
-    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+    font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.3px;
   }
   .status-pending { background: rgba(234,179,8,0.15); color: #facc15; }
   .status-claimed { background: rgba(59,130,246,0.15); color: #60a5fa; }
   .status-picked_up { background: rgba(168,85,247,0.15); color: #c084fc; }
   .status-dropped_off { background: rgba(34,197,94,0.15); color: #22c55e; }
   .status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
-  .request-detail { font-size: 12px; color: #888; margin-bottom: 3px; display: flex; align-items: flex-start; gap: 6px; }
-  .request-detail span.label { color: #555; min-width: 60px; flex-shrink: 0; }
-  .request-shuttle { font-size: 11px; color: #60a5fa; margin-top: 6px; }
-  .request-meta { font-size: 10px; color: #444; margin-top: 8px; }
-  .request-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+  /* ── Route Display ── */
+  .route-display {
+    display: flex; align-items: stretch; gap: 0; margin-bottom: 10px;
+    background: rgba(255,255,255,0.02); border-radius: 8px; padding: 12px 14px;
+  }
+  .route-point { flex: 1; }
+  .route-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 4px; }
+  .route-name { font-size: 13px; color: #ccc; font-weight: 500; }
+  .route-arrow {
+    display: flex; align-items: center; padding: 0 14px; color: #444; flex-shrink: 0;
+  }
+  .route-arrow svg { width: 20px; height: 20px; }
+
+  /* ── Detail rows ── */
+  .detail-row { display: flex; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+  .detail-item { font-size: 12px; color: #888; display: flex; align-items: center; gap: 5px; }
+  .detail-item svg { width: 14px; height: 14px; color: #555; flex-shrink: 0; }
+  .detail-item.notes-item { width: 100%; margin-top: 2px; }
+
+  /* ── Progress Tracker ── */
+  .progress-tracker { display: flex; align-items: center; gap: 0; margin: 12px 0 6px; }
+  .progress-step {
+    display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;
+    color: #444; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .progress-step.active { color: #a5b4fc; }
+  .progress-step.completed { color: #22c55e; }
+  .progress-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .progress-step.completed .progress-dot { background: #22c55e; border-color: #22c55e; }
+  .progress-step.active .progress-dot { background: transparent; border-color: #a5b4fc; box-shadow: 0 0 6px rgba(165,180,252,0.4); }
+  .progress-line { width: 20px; height: 2px; background: rgba(255,255,255,0.06); margin: 0 4px; }
+  .progress-line.completed { background: #22c55e; }
+
+  /* ── Shuttle & ETA ── */
+  .shuttle-eta-bar {
+    display: flex; align-items: center; gap: 10px; margin-top: 8px;
+    padding: 8px 12px; background: rgba(59,130,246,0.06); border-radius: 8px;
+    border: 1px solid rgba(59,130,246,0.1);
+  }
+  .shuttle-label { font-size: 12px; font-weight: 600; color: #60a5fa; }
+  .eta-chip {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
+    color: #22c55e; padding: 2px 8px; background: rgba(34,197,94,0.1); border-radius: 6px;
+  }
+  .eta-chip.stale { color: #888; background: rgba(255,255,255,0.05); }
+  .eta-chip svg { width: 14px; height: 14px; }
+
+  /* ── Timestamps ── */
+  .timestamps {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px;
+    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .timestamp-item { font-size: 10px; color: #444; }
+  .timestamp-label { color: #555; }
+
+  /* ── Actions ── */
+  .request-actions { display: flex; gap: 8px; margin-top: 12px; }
   .action-btn {
-    padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+    padding: 7px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
     border: 1px solid transparent; transition: all 0.15s;
   }
   .action-btn.edit { background: rgba(99,102,241,0.12); color: #a5b4fc; border-color: rgba(99,102,241,0.2); }
   .action-btn.edit:hover { background: rgba(99,102,241,0.25); }
   .action-btn.cancel { background: rgba(239,68,68,0.1); color: #f87171; border-color: rgba(239,68,68,0.2); }
   .action-btn.cancel:hover { background: rgba(239,68,68,0.2); }
-  .empty-state { text-align: center; padding: 40px 20px; color: #444; font-size: 13px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
+  .empty-state svg { width: 40px; height: 40px; color: #333; margin-bottom: 12px; }
+
+  /* ── Toast Notification ── */
+  .toast {
+    position: fixed; top: 70px; right: 20px; z-index: 200;
+    background: #1e3a2f; border: 1px solid rgba(34,197,94,0.3); border-radius: 10px;
+    padding: 12px 18px; font-size: 13px; font-weight: 600; color: #22c55e;
+    display: flex; align-items: center; gap: 8px;
+    transform: translateX(120%); transition: transform 0.3s ease;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateX(0); }
+  .toast svg { width: 18px; height: 18px; flex-shrink: 0; }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -96,7 +184,7 @@
     padding: 24px; width: 100%; max-width: 440px; overflow: visible;
     max-height: 90vh; overflow-y: auto;
   }
-  .modal-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 16px; }
+  .modal-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 20px; }
   .modal .field { margin-bottom: 14px; }
   .modal .field label { display: block; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
   .modal .field input, .modal .field textarea, .modal .field select {
@@ -104,31 +192,21 @@
     border-radius: 8px; color: #fff; font-size: 14px; font-family: inherit; outline: none;
     -webkit-appearance: none; appearance: none;
   }
+  .modal .field input:focus, .modal .field textarea:focus, .modal .field select:focus {
+    border-color: rgba(99,102,241,0.4); box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
   .modal .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
   .modal .field select option { background: #1a1a1a; color: #fff; }
   .modal .field textarea { resize: vertical; min-height: 60px; }
-  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal .field-hint { font-size: 10px; color: #555; margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
   .modal-btn {
-    flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    flex: 1; padding: 11px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
   .modal-btn.save { background: #3b82f6; color: #fff; }
   .modal-btn.save:hover { background: #2563eb; }
   .modal-btn.close { background: rgba(255,255,255,0.06); color: #888; }
   .modal-btn.close:hover { background: rgba(255,255,255,0.1); color: #fff; }
-
-  /* ── Connection indicator ── */
-  .conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-  .conn-dot.on { background: #22c55e; }
-  .conn-dot.off { background: #ef4444; }
-  .conn-label { font-size: 10px; color: #555; }
-
-  /* ── ETA badge ── */
-  .eta-badge {
-    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
-    color: #22c55e; margin-top: 6px;
-  }
-  .eta-badge.stale { color: #888; }
-  .eta-badge svg { width: 12px; height: 12px; }
 
   /* ── Autocomplete ── */
   .autocomplete-wrap { position: relative; }
@@ -146,10 +224,26 @@
   .autocomplete-item:last-child { border-bottom: none; }
   .geocoded-tag { font-size: 9px; font-weight: 600; color: #22c55e; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
 
+  /* ── Status select visual ── */
+  .status-select-wrap { position: relative; }
+  .status-select-wrap select { padding-left: 28px; }
+  .status-dot {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 8px; height: 8px; border-radius: 50%; pointer-events: none;
+  }
+
+  /* ── Last updated ── */
+  .last-updated { font-size: 10px; color: #444; text-align: right; margin-bottom: 16px; }
+
   @media (max-width: 640px) {
     .container { padding: 16px; }
     .top-bar { padding: 12px 16px; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .route-display { flex-direction: column; gap: 8px; }
+    .route-arrow { padding: 0; transform: rotate(90deg); justify-content: center; }
+    .filter-bar { gap: 6px; }
+    .filter-btn { padding: 7px 12px; font-size: 11px; }
+    .detail-row { gap: 10px; }
   }
 </style>
 </head>
@@ -170,20 +264,23 @@
 <div class="container">
   <!-- Stats -->
   <div class="stats-row">
-    <div class="stat-card"><div class="stat-val" id="statTotal">0</div><div class="stat-label">Total</div></div>
-    <div class="stat-card"><div class="stat-val pending" id="statPending">0</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-val" id="statTotal">0</div><div class="stat-label">Total Requests</div></div>
+    <div class="stat-card" id="pendingCard"><div class="stat-val pending" id="statPending">0</div><div class="stat-label">Waiting</div></div>
     <div class="stat-card"><div class="stat-val active" id="statActive">0</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card"><div class="stat-val done" id="statDone">0</div><div class="stat-label">Completed</div></div>
   </div>
 
   <!-- Filter Bar -->
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('all')">All</button>
-    <button class="filter-btn" onclick="setFilter('pending')">Pending</button>
-    <button class="filter-btn" onclick="setFilter('in_progress')">In Progress</button>
-    <button class="filter-btn" onclick="setFilter('completed')">Completed</button>
-    <button class="filter-btn" onclick="setFilter('cancelled')">Cancelled</button>
+  <div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All <span class="filter-count" id="fcAll">0</span></button>
+    <button class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">Waiting <span class="filter-count" id="fcPending">0</span></button>
+    <button class="filter-btn" data-filter="in_progress" onclick="setFilter('in_progress', this)">In Progress <span class="filter-count" id="fcProgress">0</span></button>
+    <button class="filter-btn" data-filter="completed" onclick="setFilter('completed', this)">Completed <span class="filter-count" id="fcDone">0</span></button>
+    <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled', this)">Cancelled <span class="filter-count" id="fcCancelled">0</span></button>
   </div>
+
+  <!-- Last updated -->
+  <div class="last-updated" id="lastUpdated"></div>
 
   <!-- Requests -->
   <div class="section-header">
@@ -193,18 +290,24 @@
   <div id="requestsList"></div>
 </div>
 
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+  <span id="toastMsg">New request received</span>
+</div>
+
 <!-- Edit Modal -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
-    <div class="modal-title">Edit Request</div>
+    <div class="modal-title" id="modalTitle">Edit Request</div>
     <input type="hidden" id="editId">
     <div class="field">
       <label>Passenger Name</label>
-      <input type="text" id="editName">
+      <input type="text" id="editName" placeholder="Full name">
     </div>
     <div class="field">
       <label>Phone Number</label>
-      <input type="tel" id="editPhone">
+      <input type="tel" id="editPhone" placeholder="Phone number">
     </div>
     <div class="field">
       <label>Pickup Location <span class="geocoded-tag" id="pickupGeoTag" style="display:none">Geocoded</span></label>
@@ -225,7 +328,7 @@
         <option value="custom">Custom Address</option>
       </select>
       <div class="autocomplete-wrap" id="pickupCustomWrap" style="display:none;margin-top:8px;">
-        <input type="text" id="editPickup" autocomplete="off" placeholder="Enter address" oninput="onAddressInput('pickup')">
+        <input type="text" id="editPickup" autocomplete="off" placeholder="Type an address..." oninput="onAddressInput('pickup')">
         <input type="hidden" id="editPickupLat">
         <input type="hidden" id="editPickupLng">
         <div class="autocomplete-list" id="pickupSuggestions"></div>
@@ -250,7 +353,7 @@
         <option value="custom">Custom Address</option>
       </select>
       <div class="autocomplete-wrap" id="dropoffCustomWrap" style="display:none;margin-top:8px;">
-        <input type="text" id="editDropoff" autocomplete="off" placeholder="Enter address" oninput="onAddressInput('dropoff')">
+        <input type="text" id="editDropoff" autocomplete="off" placeholder="Type an address..." oninput="onAddressInput('dropoff')">
         <input type="hidden" id="editDropoffLat">
         <input type="hidden" id="editDropoffLng">
         <div class="autocomplete-list" id="dropoffSuggestions"></div>
@@ -259,20 +362,24 @@
     <div class="field">
       <label>Pickup Time</label>
       <input type="time" id="editTime">
+      <div class="field-hint">Time is in Central Time (CT)</div>
     </div>
     <div class="field">
       <label>Status</label>
-      <select id="editStatus">
-        <option value="pending">Pending</option>
-        <option value="claimed">Claimed</option>
-        <option value="picked_up">Picked Up</option>
-        <option value="dropped_off">Dropped Off</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
+      <div class="status-select-wrap">
+        <span class="status-dot" id="statusDot" style="background:#facc15"></span>
+        <select id="editStatus" onchange="updateStatusDot()">
+          <option value="pending">Waiting for Shuttle</option>
+          <option value="claimed">Shuttle Assigned</option>
+          <option value="picked_up">Passenger Picked Up</option>
+          <option value="dropped_off">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
     </div>
     <div class="field">
       <label>Notes</label>
-      <textarea id="editNotes"></textarea>
+      <textarea id="editNotes" placeholder="Any special requirements or instructions..."></textarea>
     </div>
     <div class="modal-actions">
       <button class="modal-btn close" onclick="closeModal()">Cancel</button>
@@ -300,6 +407,23 @@ const STOPS = {
   rollins:     { name: 'Rollins Theater',            lat: 30.25964, lng: -97.75392 },
   rivian:      { name: 'Rivian',                     lat: 30.25977, lng: -97.74622 },
   continental: { name: 'Continental Club / SoCo',    lat: 30.25044, lng: -97.74922 },
+};
+
+// Human-friendly status labels
+const STATUS_LABELS = {
+  pending: 'Waiting',
+  claimed: 'Shuttle Assigned',
+  picked_up: 'Picked Up',
+  dropped_off: 'Completed',
+  cancelled: 'Cancelled'
+};
+
+const STATUS_COLORS = {
+  pending: '#facc15',
+  claimed: '#60a5fa',
+  picked_up: '#c084fc',
+  dropped_off: '#22c55e',
+  cancelled: '#ef4444'
 };
 
 // Reverse-lookup: find stop key by location name
@@ -334,6 +458,12 @@ function onAdminStopSelect(field) {
   }
 }
 
+function updateStatusDot() {
+  const sel = document.getElementById('editStatus');
+  const dot = document.getElementById('statusDot');
+  dot.style.background = STATUS_COLORS[sel.value] || '#888';
+}
+
 let allRequests = [];
 let currentFilter = 'all';
 
@@ -352,6 +482,7 @@ async function loadRequests() {
   if (error) { console.error('Load error:', error); return; }
   allRequests = data || [];
   render();
+  updateLastUpdated();
 }
 
 /* ── Realtime ── */
@@ -360,6 +491,7 @@ function subscribeRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sxsw_ada_requests' }, payload => {
       if (payload.eventType === 'INSERT') {
         allRequests.unshift(payload.new);
+        showToast(`New request from ${payload.new.passenger_name}`);
       } else if (payload.eventType === 'UPDATE') {
         const idx = allRequests.findIndex(r => r.id === payload.new.id);
         if (idx >= 0) allRequests[idx] = payload.new; else allRequests.unshift(payload.new);
@@ -367,6 +499,7 @@ function subscribeRealtime() {
         allRequests = allRequests.filter(r => r.id !== payload.old.id);
       }
       render();
+      updateLastUpdated();
     })
     .subscribe((status) => {
       const dot = document.getElementById('connDot');
@@ -379,11 +512,24 @@ function subscribeRealtime() {
     });
 }
 
+/* ── Toast ── */
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+/* ── Last Updated ── */
+function updateLastUpdated() {
+  document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'America/Chicago' }) + ' CT';
+}
+
 /* ── Filter ── */
-function setFilter(f) {
+function setFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
   render();
 }
 
@@ -396,47 +542,126 @@ function getFiltered() {
 
 /* ── Render ── */
 function render() {
-  // Stats
   const pending = allRequests.filter(r => r.status === 'pending').length;
   const inProgress = allRequests.filter(r => ['claimed','picked_up'].includes(r.status)).length;
   const done = allRequests.filter(r => r.status === 'dropped_off').length;
+  const cancelled = allRequests.filter(r => r.status === 'cancelled').length;
+
   document.getElementById('statTotal').textContent = allRequests.length;
   document.getElementById('statPending').textContent = pending;
   document.getElementById('statActive').textContent = inProgress;
   document.getElementById('statDone').textContent = done;
 
+  // Highlight pending card when there are waiting requests
+  const pendingCard = document.getElementById('pendingCard');
+  pendingCard.classList.toggle('has-pending', pending > 0);
+
+  // Filter counts
+  document.getElementById('fcAll').textContent = allRequests.length;
+  document.getElementById('fcPending').textContent = pending;
+  document.getElementById('fcProgress').textContent = inProgress;
+  document.getElementById('fcDone').textContent = done;
+  document.getElementById('fcCancelled').textContent = cancelled;
+
   // List
   const filtered = getFiltered();
-  document.getElementById('filterCount').textContent = filtered.length ? `${filtered.length}` : '';
+  document.getElementById('filterCount').textContent = filtered.length ? `${filtered.length} showing` : '';
   document.getElementById('requestsList').innerHTML = filtered.length
     ? filtered.map(r => renderCard(r)).join('')
-    : '<div class="empty-state">No requests matching this filter</div>';
+    : `<div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <div>No requests matching this filter</div>
+       </div>`;
 }
 
 function renderCard(r) {
-  const statusLabels = { pending: 'Pending', claimed: 'Claimed', picked_up: 'Picked Up', dropped_off: 'Dropped Off', cancelled: 'Cancelled' };
   const time = formatTime(r.pickup_time);
-  const created = formatDateTime(r.created_at);
   const canEdit = ['pending','claimed','picked_up'].includes(r.status);
   const canCancel = ['pending','claimed'].includes(r.status);
+  const relTime = relativeTime(r.created_at);
+
+  // Progress steps
+  const steps = ['pending', 'claimed', 'picked_up', 'dropped_off'];
+  const currentStep = steps.indexOf(r.status);
+  const isCancelled = r.status === 'cancelled';
+
+  let progressHtml = '';
+  if (!isCancelled) {
+    progressHtml = '<div class="progress-tracker">';
+    const labels = ['Requested', 'Assigned', 'Picked Up', 'Completed'];
+    steps.forEach((s, i) => {
+      const isCompleted = i < currentStep;
+      const isActive = i === currentStep;
+      progressHtml += `<div class="progress-step${isCompleted ? ' completed' : ''}${isActive ? ' active' : ''}">
+        <span class="progress-dot"></span>
+        <span>${labels[i]}</span>
+      </div>`;
+      if (i < steps.length - 1) {
+        progressHtml += `<div class="progress-line${i < currentStep ? ' completed' : ''}"></div>`;
+      }
+    });
+    progressHtml += '</div>';
+  }
+
+  // Shuttle & ETA bar
+  let shuttleHtml = '';
+  if (r.shuttle_num && ['claimed','picked_up'].includes(r.status)) {
+    let etaHtml = '';
+    if (r.eta_minutes != null) {
+      const stale = isStaleEta(r);
+      etaHtml = `<span class="eta-chip${stale ? ' stale' : ''}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        ${stale ? '~' : ''}${r.eta_minutes} min away
+      </span>`;
+    }
+    shuttleHtml = `<div class="shuttle-eta-bar">
+      <span class="shuttle-label">Shuttle ${r.shuttle_num}</span>
+      ${etaHtml}
+    </div>`;
+  }
+
+  // Timestamps
+  let tsHtml = `<span class="timestamp-item"><span class="timestamp-label">Submitted</span> ${relTime}</span>`;
+  if (r.claimed_at) tsHtml += `<span class="timestamp-item"><span class="timestamp-label">Assigned</span> ${formatDateTime(r.claimed_at)}</span>`;
+  if (r.picked_up_at) tsHtml += `<span class="timestamp-item"><span class="timestamp-label">Picked up</span> ${formatDateTime(r.picked_up_at)}</span>`;
+  if (r.dropped_off_at) tsHtml += `<span class="timestamp-item"><span class="timestamp-label">Completed</span> ${formatDateTime(r.dropped_off_at)}</span>`;
 
   return `
-    <div class="request-card">
+    <div class="request-card status-${r.status}">
       <div class="request-card-header">
         <span>
           <span class="trip-num">#${r.trip_number || '—'}</span>
           <span class="request-name">${esc(r.passenger_name)}</span>
           <span class="request-phone">${esc(r.passenger_phone)}</span>
         </span>
-        <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
+        <span class="status-badge status-${r.status}">${STATUS_LABELS[r.status]}</span>
       </div>
-      <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}${r.pickup_lat ? ' <span class="geocoded-tag">Geocoded</span>' : ''}</div>
-      <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}${r.dropoff_lat ? ' <span class="geocoded-tag">Geocoded</span>' : ''}</div>
-      <div class="request-detail"><span class="label">Time</span> ${time}</div>
-      ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) ? ` · <span class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</span>` : ''}</div>` : ''}
-      ${!r.shuttle_num && r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) ? `<div class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</div>` : ''}
-      <div class="request-meta">Submitted ${created}${r.claimed_at ? ' · Claimed ' + formatDateTime(r.claimed_at) : ''}${r.picked_up_at ? ' · Picked up ' + formatDateTime(r.picked_up_at) : ''}${r.dropped_off_at ? ' · Dropped off ' + formatDateTime(r.dropped_off_at) : ''}</div>
+      <div class="route-display">
+        <div class="route-point">
+          <div class="route-label">Pickup</div>
+          <div class="route-name">${esc(r.pickup_location)}</div>
+        </div>
+        <div class="route-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+        <div class="route-point">
+          <div class="route-label">Drop-off</div>
+          <div class="route-name">${esc(r.dropoff_location)}</div>
+        </div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          ${time}
+        </div>
+        ${r.notes ? `<div class="detail-item notes-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          ${esc(r.notes)}
+        </div>` : ''}
+      </div>
+      ${shuttleHtml}
+      ${progressHtml}
+      <div class="timestamps">${tsHtml}</div>
       ${canEdit || canCancel ? `
         <div class="request-actions">
           ${canEdit ? `<button class="action-btn edit" onclick="openEdit('${r.id}')">Edit</button>` : ''}
@@ -452,6 +677,8 @@ function openEdit(id) {
   document.getElementById('editId').value = r.id;
   document.getElementById('editName').value = r.passenger_name;
   document.getElementById('editPhone').value = r.passenger_phone;
+  document.getElementById('modalTitle').textContent = `Edit Trip #${r.trip_number || '—'}`;
+
   // Set pickup dropdown or custom
   const pickupKey = findStopKey(r.pickup_location);
   const pickupSel = document.getElementById('editPickupSelect');
@@ -493,6 +720,7 @@ function openEdit(id) {
   }
   document.getElementById('editStatus').value = r.status;
   document.getElementById('editNotes').value = r.notes || '';
+  updateStatusDot();
 
   // Parse pickup time to CT
   const d = new Date(r.pickup_time);
@@ -564,7 +792,7 @@ async function saveEdit() {
 
 /* ── Cancel ── */
 async function cancelRequest(id) {
-  if (!confirm('Cancel this request?')) return;
+  if (!confirm('Are you sure you want to cancel this trip?')) return;
   const req = allRequests.find(r => r.id === id);
   const { error } = await sb.from('sxsw_ada_requests').update({
     status: 'cancelled',
@@ -592,6 +820,17 @@ function formatTime(iso) {
 function formatDateTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function relativeTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return formatDateTime(iso);
 }
 
 function esc(s) {
@@ -738,6 +977,9 @@ async function updateAllEtas() {
     } catch (e) { console.error('MapsIndoors error for shuttle', shuttleNum, e); }
   }
 }
+
+// Refresh relative times every 30 seconds
+setInterval(() => render(), 30000);
 </script>
 </body>
 </html>
