@@ -257,6 +257,7 @@
     font-size: 13px; font-weight: 800; color: #fff;
   }
   .shuttle-marker-icon.s2 { background: #f59e0b; }
+  .shuttle-marker-icon.stale { background: #555; border-color: #888; opacity: 0.6; }
 
   /* ── Last updated ── */
   .last-updated { font-size: 10px; color: #444; text-align: right; margin-bottom: 16px; }
@@ -949,6 +950,7 @@ let map = null;
 let mapMarkers = [];
 let shuttleMarkers = {};
 let shuttleLastSeen = {};
+let shuttleLastCoords = {};
 let mapVisible = false;
 let shuttlePollInterval = null;
 
@@ -1025,10 +1027,13 @@ function renderMap() {
 }
 
 /* ── Shuttle GPS Markers ── */
-function createShuttleIcon(num) {
+const SHUTTLE_STALE_MS = 5 * 60 * 1000; // 5 minutes
+
+function createShuttleIcon(num, stale) {
+  const cls = stale ? ' stale' : (num === 2 ? ' s2' : '');
   return L.divIcon({
     className: '',
-    html: `<div class="shuttle-marker-icon${num === 2 ? ' s2' : ''}">${num}</div>`,
+    html: `<div class="shuttle-marker-icon${cls}">${num}</div>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
     popupAnchor: [0, -18]
@@ -1056,15 +1061,24 @@ async function updateShuttleMarkers() {
       const lat = coords.latitude;
       const lng = coords.longitude;
 
-      shuttleLastSeen[num] = new Date();
-      const popupContent = () => `<div class="popup-trip">Shuttle ${num}</div><div class="popup-time">Updated ${relativeTime(shuttleLastSeen[num].toISOString())}</div>`;
+      // Only update last-seen when position actually changes
+      const prev = shuttleLastCoords[num];
+      if (!prev || prev.lat !== lat || prev.lng !== lng) {
+        shuttleLastSeen[num] = new Date();
+        shuttleLastCoords[num] = { lat, lng };
+      }
+
+      const stale = shuttleLastSeen[num] && (Date.now() - shuttleLastSeen[num].getTime()) > SHUTTLE_STALE_MS;
+      const statusText = stale ? 'Last moved' : 'Last seen';
+      const popupContent = `<div class="popup-trip">Shuttle ${num}${stale ? ' (stale)' : ''}</div><div class="popup-time">${statusText} ${relativeTime(shuttleLastSeen[num].toISOString())}</div>`;
 
       if (shuttleMarkers[num]) {
         shuttleMarkers[num].setLatLng([lat, lng]);
-        shuttleMarkers[num].setPopupContent(popupContent());
+        shuttleMarkers[num].setIcon(createShuttleIcon(num, stale));
+        shuttleMarkers[num].setPopupContent(popupContent);
       } else {
-        shuttleMarkers[num] = L.marker([lat, lng], { icon: createShuttleIcon(num), zIndexOffset: 1000 })
-          .bindPopup(popupContent())
+        shuttleMarkers[num] = L.marker([lat, lng], { icon: createShuttleIcon(num, stale), zIndexOffset: 1000 })
+          .bindPopup(popupContent)
           .addTo(map);
       }
     } catch (e) { console.error('Shuttle GPS error for shuttle', num, e); }
