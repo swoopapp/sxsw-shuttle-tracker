@@ -738,9 +738,8 @@ async function saveEdit() {
   const id = document.getElementById('editId').value;
   const timeVal = document.getElementById('editTime').value;
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-  const pickupTime = new Date(`${today}T${timeVal}:00`);
-  const ctOffset = getCTOffset();
-  const pickupUTC = new Date(pickupTime.getTime() - ctOffset);
+  // Parse as CT by appending explicit CT offset to ISO string
+  const pickupUTC = new Date(`${today}T${timeVal}:00${getCTOffsetStr()}`);
 
   const newStatus = document.getElementById('editStatus').value;
   const oldReq = allRequests.find(r => r.id === id);
@@ -804,12 +803,13 @@ async function cancelRequest(id) {
 }
 
 /* ── Helpers ── */
-function getCTOffset() {
-  const jan = new Date(new Date().getFullYear(), 0, 1);
-  const jul = new Date(new Date().getFullYear(), 6, 1);
-  const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
-  const isDST = new Date().getTimezoneOffset() < stdOffset;
-  return isDST ? -5 * 60 * 60 * 1000 : -6 * 60 * 60 * 1000;
+function getCTOffsetStr() {
+  // Determine current CT offset (CDT=-05:00, CST=-06:00) regardless of browser timezone
+  const now = new Date();
+  const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC' });
+  const ctStr = now.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+  const diffHours = Math.round((new Date(utcStr) - new Date(ctStr)) / 3600000);
+  return '-' + String(diffHours).padStart(2, '0') + ':00';
 }
 
 function formatTime(iso) {
