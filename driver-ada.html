@@ -77,6 +77,7 @@
   }
   .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .request-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .trip-num { font-size: 12px; font-weight: 700; color: #6366f1; margin-right: 6px; }
   .request-phone-link { font-size: 13px; color: #60a5fa; text-decoration: none; margin-left: 8px; }
   .status-badge {
     font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
@@ -331,7 +332,7 @@ async function claimTrip(id) {
   }).eq('id', id);
   if (error) { alert('Error claiming trip.'); console.error(error); btn.disabled = false; btn.textContent = 'CLAIM TRIP'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_claimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
+  if (req) notifySlack('ada_claimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
   currentTab = 'mytrip';
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tabMyTrip').classList.add('active');
@@ -347,7 +348,7 @@ async function markPickedUp(id) {
   }).eq('id', id);
   if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'PICKED UP'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_picked_up', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
+  if (req) notifySlack('ada_picked_up', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
 }
 
 async function markDroppedOff(id) {
@@ -360,7 +361,7 @@ async function markDroppedOff(id) {
   }).eq('id', id);
   if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'DROPPED OFF'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_dropped_off', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, dropoff_location: req.dropoff_location });
+  if (req) notifySlack('ada_dropped_off', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
 }
 
 /* ── Render ── */
@@ -388,7 +389,7 @@ function render() {
       banner = `
         <div class="active-trip-banner">
           <div class="active-trip-banner-title">Active Trip</div>
-          <div style="font-size:13px;color:#ccc;">${esc(t.passenger_name)} — ${esc(t.pickup_location)} → ${esc(t.dropoff_location)}</div>
+          <div style="font-size:13px;color:#ccc;">Trip #${t.trip_number || '—'}: ${esc(t.passenger_name)} — ${esc(t.pickup_location)} → ${esc(t.dropoff_location)}</div>
         </div>`;
     }
     area.innerHTML = banner + (available.length
@@ -410,7 +411,7 @@ function renderAvailableCard(r) {
   return `
     <div class="request-card">
       <div class="request-card-header">
-        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span><span class="trip-num">#${r.trip_number || '—'}</span><span class="request-name">${esc(r.passenger_name)}</span></span>
         <span class="status-badge status-pending">Pending</span>
       </div>
       <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>
@@ -431,7 +432,7 @@ function renderMyTripCard(r) {
   return `
     <div class="request-card">
       <div class="request-card-header">
-        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span><span class="trip-num">#${r.trip_number || '—'}</span><span class="request-name">${esc(r.passenger_name)}</span></span>
         <span class="status-badge status-${r.status}">${isClaimed ? 'Claimed' : 'Picked Up'}</span>
       </div>
       <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>
@@ -453,7 +454,7 @@ function renderHistoryCard(r) {
   return `
     <div class="request-card completed-card">
       <div class="request-card-header">
-        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span><span class="trip-num">#${r.trip_number || '—'}</span><span class="request-name">${esc(r.passenger_name)}</span></span>
         <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
       </div>
       <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>

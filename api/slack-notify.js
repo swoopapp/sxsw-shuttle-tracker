@@ -1,22 +1,42 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-  if (!webhookUrl) return res.status(500).json({ error: 'SLACK_WEBHOOK_URL not configured' });
+  const botToken = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_CHANNEL_ID;
+  if (!botToken || !channel) return res.status(500).json({ error: 'SLACK_BOT_TOKEN or SLACK_CHANNEL_ID not configured' });
 
   const { event_type, data } = req.body || {};
   if (!event_type) return res.status(400).json({ error: 'Missing event_type' });
 
   const message = formatSlackMessage(event_type, data || {});
+  const isNewRequest = event_type === 'ada_new_request';
+  const threadTs = data?.slack_thread_ts || null;
+
+  const payload = {
+    channel,
+    text: message.text,
+    blocks: message.blocks,
+  };
+
+  // Thread follow-up events under the original message
+  if (!isNewRequest && threadTs) {
+    payload.thread_ts = threadTs;
+  }
 
   try {
-    const resp = await fetch(webhookUrl, {
+    const resp = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(message),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${botToken}`,
+      },
+      body: JSON.stringify(payload),
     });
-    if (!resp.ok) return res.status(502).json({ error: 'Slack webhook failed' });
-    return res.status(200).json({ ok: true });
+    const result = await resp.json();
+    if (!result.ok) return res.status(502).json({ error: result.error });
+
+    // Return the ts so the client can save it for threading
+    return res.status(200).json({ ok: true, ts: result.ts });
   } catch (err) {
     return res.status(502).json({ error: 'Failed to reach Slack' });
   }
@@ -45,38 +65,28 @@ function formatSlackMessage(event_type, data) {
 
     case 'ada_claimed':
       blocks.push(
-        section(`*ADA Trip Claimed* :blue_car:\n*Shuttle ${data.shuttle_num}* claimed the trip for *${data.passenger_name}*`),
-        section(
-          `*Pickup:* ${data.pickup_location}\n` +
-          `*Drop-off:* ${data.dropoff_location}`
-        ),
+        section(`*Trip Claimed* :blue_car:\n*Shuttle ${data.shuttle_num}* claimed the trip for *${data.passenger_name}*`),
         context(`Claimed at ${ts} CT`)
       );
-      return { blocks, text: `Shuttle ${data.shuttle_num} claimed ADA trip for ${data.passenger_name}` };
+      return { blocks, text: `Shuttle ${data.shuttle_num} claimed trip for ${data.passenger_name}` };
 
     case 'ada_picked_up':
       blocks.push(
         section(`*Passenger Picked Up* :busstop:\n*Shuttle ${data.shuttle_num}* picked up *${data.passenger_name}*`),
-        section(`*From:* ${data.pickup_location}\n*Heading to:* ${data.dropoff_location}`),
         context(`Picked up at ${ts} CT`)
       );
       return { blocks, text: `Shuttle ${data.shuttle_num} picked up ${data.passenger_name}` };
 
     case 'ada_dropped_off':
       blocks.push(
-        section(`*Trip Complete* :white_check_mark:\n*Shuttle ${data.shuttle_num}* dropped off *${data.passenger_name}*`),
-        section(`*At:* ${data.dropoff_location}`),
+        section(`*Trip Complete* :white_check_mark:\n*Shuttle ${data.shuttle_num}* dropped off *${data.passenger_name}* at *${data.dropoff_location}*`),
         context(`Completed at ${ts} CT`)
       );
       return { blocks, text: `Shuttle ${data.shuttle_num} dropped off ${data.passenger_name}` };
 
     case 'ada_cancelled':
       blocks.push(
-        section(`*ADA Request Cancelled* :x:\nTrip for *${data.passenger_name}* was cancelled`),
-        section(
-          `*Pickup:* ${data.pickup_location}\n` +
-          `*Drop-off:* ${data.dropoff_location}`
-        ),
+        section(`*Request Cancelled* :x:\nTrip for *${data.passenger_name}* was cancelled`),
         context(`Cancelled at ${ts} CT`)
       );
       return { blocks, text: `ADA request for ${data.passenger_name} cancelled` };

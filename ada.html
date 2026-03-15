@@ -67,6 +67,7 @@
   }
   .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .request-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .trip-num { font-size: 11px; font-weight: 700; color: #6366f1; margin-right: 6px; }
   .status-badge {
     font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
   }
@@ -228,18 +229,24 @@ async function submitRequest(e) {
     status: 'pending'
   };
 
-  const { error } = await sb.from('sxsw_ada_requests').insert([record]);
+  const { data: inserted, error } = await sb.from('sxsw_ada_requests').insert([record]).select();
   btn.disabled = false; btn.textContent = 'Submit Request';
 
   if (error) { alert('Error submitting request. Please try again.'); console.error(error); return; }
 
-  notifySlack('ada_new_request', {
-    passenger_name: record.passenger_name,
-    pickup_location: record.pickup_location,
-    dropoff_location: record.dropoff_location,
-    pickup_time: document.getElementById('pickupTime').value,
-    notes: record.notes
-  });
+  // Post to Slack and save thread ts for follow-up threading
+  const row = inserted && inserted[0];
+  if (row) {
+    notifySlack('ada_new_request', {
+      passenger_name: record.passenger_name,
+      pickup_location: record.pickup_location,
+      dropoff_location: record.dropoff_location,
+      pickup_time: document.getElementById('pickupTime').value,
+      notes: record.notes
+    }).then(slackTs => {
+      if (slackTs) sb.from('sxsw_ada_requests').update({ slack_thread_ts: slackTs }).eq('id', row.id).then(() => {});
+    });
+  }
 
   document.getElementById('requestForm').reset();
   // Reset time to now
@@ -284,15 +291,15 @@ function renderCard(r) {
   return `
     <div class="request-card">
       <div class="request-card-header">
-        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span><span class="trip-num">#${r.trip_number || '—'}</span><span class="request-name">${esc(r.passenger_name)}</span></span>
         <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
       </div>
       <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}</div>
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && r.status === 'claimed' ? ` · ETA ${r.eta_minutes} min` : ''}</div>` : ''}
-      ${r.eta_minutes != null && r.status === 'claimed' && !r.shuttle_num ? `<div class="eta-badge">ETA ${r.eta_minutes} min</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) ? ` · ETA ${r.eta_minutes} min` : ''}</div>` : ''}
+      ${r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) && !r.shuttle_num ? `<div class="eta-badge">ETA ${r.eta_minutes} min</div>` : ''}
     </div>`;
 }
 
@@ -307,12 +314,16 @@ function esc(s) {
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
 }
 
-function notifySlack(event_type, data) {
-  fetch('/api/slack-notify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event_type, data })
-  }).catch(() => {});
+async function notifySlack(event_type, data) {
+  try {
+    const res = await fetch('/api/slack-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_type, data })
+    });
+    const json = await res.json();
+    return json.ts || null;
+  } catch (e) { return null; }
 }
 </script>
 </body>

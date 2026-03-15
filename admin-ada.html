@@ -60,6 +60,7 @@
   .request-card:hover { border-color: rgba(255,255,255,0.12); }
   .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .request-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .trip-num { font-size: 11px; font-weight: 700; color: #6366f1; margin-right: 6px; }
   .request-phone { font-size: 12px; color: #888; margin-left: 8px; }
   .status-badge {
     font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
@@ -92,7 +93,8 @@
   .modal-overlay.show { display: flex; }
   .modal {
     background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
-    padding: 24px; width: 100%; max-width: 440px;
+    padding: 24px; width: 100%; max-width: 440px; overflow: visible;
+    max-height: 90vh; overflow-y: auto;
   }
   .modal-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 16px; }
   .modal .field { margin-bottom: 14px; }
@@ -339,17 +341,18 @@ function renderCard(r) {
     <div class="request-card">
       <div class="request-card-header">
         <span>
+          <span class="trip-num">#${r.trip_number || '—'}</span>
           <span class="request-name">${esc(r.passenger_name)}</span>
           <span class="request-phone">${esc(r.passenger_phone)}</span>
         </span>
         <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
       </div>
-      <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}</div>
-      <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
+      <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}${r.pickup_lat ? ' <span class="geocoded-tag">Geocoded</span>' : ''}</div>
+      <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}${r.dropoff_lat ? ' <span class="geocoded-tag">Geocoded</span>' : ''}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && ['claimed'].includes(r.status) ? ` · <span class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</span>` : ''}</div>` : ''}
-      ${!r.shuttle_num && r.eta_minutes != null ? `<div class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) ? ` · <span class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</span>` : ''}</div>` : ''}
+      ${!r.shuttle_num && r.eta_minutes != null && ['claimed','picked_up'].includes(r.status) ? `<div class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</div>` : ''}
       <div class="request-meta">Submitted ${created}${r.claimed_at ? ' · Claimed ' + formatDateTime(r.claimed_at) : ''}${r.picked_up_at ? ' · Picked up ' + formatDateTime(r.picked_up_at) : ''}${r.dropped_off_at ? ' · Dropped off ' + formatDateTime(r.dropped_off_at) : ''}</div>
       ${canEdit || canCancel ? `
         <div class="request-actions">
@@ -430,7 +433,7 @@ async function saveEdit() {
   if (oldReq && newStatus !== oldReq.status) {
     const slackEvents = { claimed: 'ada_claimed', picked_up: 'ada_picked_up', dropped_off: 'ada_dropped_off', cancelled: 'ada_cancelled' };
     const evt = slackEvents[newStatus];
-    if (evt) notifySlack(evt, { shuttle_num: oldReq.shuttle_num, passenger_name: updates.passenger_name, pickup_location: updates.pickup_location, dropoff_location: updates.dropoff_location });
+    if (evt) notifySlack(evt, { shuttle_num: oldReq.shuttle_num, passenger_name: updates.passenger_name, pickup_location: updates.pickup_location, dropoff_location: updates.dropoff_location, slack_thread_ts: oldReq.slack_thread_ts });
   }
   closeModal();
 }
@@ -445,7 +448,7 @@ async function cancelRequest(id) {
     updated_at: new Date().toISOString()
   }).eq('id', id);
   if (error) { alert('Error cancelling.'); console.error(error); return; }
-  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
+  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
 }
 
 /* ── Helpers ── */
@@ -500,9 +503,11 @@ function onAddressInput(field) {
 }
 
 async function fetchSuggestions(field, query) {
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&proximity=-97.74,30.26&bbox=-97.90,30.15,-97.60,30.40&limit=5&types=address,poi`;
+  const searchQuery = query.toLowerCase().includes('austin') ? query : query + ' Austin TX';
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${MAPBOX_TOKEN}&proximity=-97.74,30.26&country=us&limit=5&fuzzyMatch=true`;
   try {
     const res = await fetch(url);
+    if (!res.ok) { console.error('Geocode HTTP error:', res.status); return; }
     const data = await res.json();
     const listEl = document.getElementById(field === 'pickup' ? 'pickupSuggestions' : 'dropoffSuggestions');
     if (!data.features || !data.features.length) { hideSuggestions(field); return; }
