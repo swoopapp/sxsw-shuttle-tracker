@@ -370,7 +370,8 @@ let laps = [];
    ═══════════════════════════════════════════ */
 function isNightMode() {
   const ct = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
-  return new Date(ct).getHours() >= 19;
+  const h = new Date(ct).getHours();
+  return h >= 19 || h < 4;
 }
 
 function getActiveRoute() { return isNightMode() ? NIGHT_ROUTE : DAY_ROUTE; }
