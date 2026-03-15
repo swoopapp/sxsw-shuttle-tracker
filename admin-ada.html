@@ -713,7 +713,7 @@ async function updateAllEtas() {
       if (!data || !data.length) continue;
 
       const pos = data[0];
-      const coords = pos.data?.coordinates || pos.coordinates;
+      const coords = pos.properties?.coordinates || pos.data?.coordinates || pos.coordinates;
       if (!coords || !coords.latitude || !coords.longitude) continue;
 
       const driverLat = coords.latitude;

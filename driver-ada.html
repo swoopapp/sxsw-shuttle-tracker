@@ -246,7 +246,7 @@ async function updateEta() {
     if (!data || !data.length) return;
 
     const pos = data[0];
-    const coords = pos.data?.coordinates || pos.coordinates;
+    const coords = pos.properties?.coordinates || pos.data?.coordinates || pos.coordinates;
     if (!coords) return;
 
     const driverLat = coords.latitude;
