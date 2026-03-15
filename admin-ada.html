@@ -117,6 +117,30 @@
   .conn-dot.off { background: #ef4444; }
   .conn-label { font-size: 10px; color: #555; }
 
+  /* ── ETA badge ── */
+  .eta-badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700;
+    color: #22c55e; margin-top: 6px;
+  }
+  .eta-badge.stale { color: #888; }
+  .eta-badge svg { width: 12px; height: 12px; }
+
+  /* ── Autocomplete ── */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+    background: #222; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+    margin-top: 4px; max-height: 200px; overflow-y: auto; display: none;
+  }
+  .autocomplete-list.show { display: block; }
+  .autocomplete-item {
+    padding: 10px 12px; font-size: 13px; color: #ccc; cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .autocomplete-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .geocoded-tag { font-size: 9px; font-weight: 600; color: #22c55e; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
+
   @media (max-width: 640px) {
     .container { padding: 16px; }
     .top-bar { padding: 12px 16px; }
@@ -178,12 +202,22 @@
       <input type="tel" id="editPhone">
     </div>
     <div class="field">
-      <label>Pickup Location</label>
-      <input type="text" id="editPickup">
+      <label>Pickup Location <span class="geocoded-tag" id="pickupGeoTag" style="display:none">Geocoded</span></label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="editPickup" autocomplete="off" oninput="onAddressInput('pickup')">
+        <input type="hidden" id="editPickupLat">
+        <input type="hidden" id="editPickupLng">
+        <div class="autocomplete-list" id="pickupSuggestions"></div>
+      </div>
     </div>
     <div class="field">
-      <label>Drop-off Location</label>
-      <input type="text" id="editDropoff">
+      <label>Drop-off Location <span class="geocoded-tag" id="dropoffGeoTag" style="display:none">Geocoded</span></label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="editDropoff" autocomplete="off" oninput="onAddressInput('dropoff')">
+        <input type="hidden" id="editDropoffLat">
+        <input type="hidden" id="editDropoffLng">
+        <div class="autocomplete-list" id="dropoffSuggestions"></div>
+      </div>
     </div>
     <div class="field">
       <label>Pickup Time</label>
@@ -314,7 +348,8 @@ function renderCard(r) {
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && ['claimed'].includes(r.status) ? ` · <span class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</span>` : ''}</div>` : ''}
+      ${!r.shuttle_num && r.eta_minutes != null ? `<div class="eta-badge${isStaleEta(r) ? ' stale' : ''}">ETA ${r.eta_minutes} min</div>` : ''}
       <div class="request-meta">Submitted ${created}${r.claimed_at ? ' · Claimed ' + formatDateTime(r.claimed_at) : ''}${r.picked_up_at ? ' · Picked up ' + formatDateTime(r.picked_up_at) : ''}${r.dropped_off_at ? ' · Dropped off ' + formatDateTime(r.dropped_off_at) : ''}</div>
       ${canEdit || canCancel ? `
         <div class="request-actions">
@@ -332,7 +367,13 @@ function openEdit(id) {
   document.getElementById('editName').value = r.passenger_name;
   document.getElementById('editPhone').value = r.passenger_phone;
   document.getElementById('editPickup').value = r.pickup_location;
+  document.getElementById('editPickupLat').value = r.pickup_lat || '';
+  document.getElementById('editPickupLng').value = r.pickup_lng || '';
   document.getElementById('editDropoff').value = r.dropoff_location;
+  document.getElementById('editDropoffLat').value = r.dropoff_lat || '';
+  document.getElementById('editDropoffLng').value = r.dropoff_lng || '';
+  document.getElementById('pickupGeoTag').style.display = r.pickup_lat ? 'inline' : 'none';
+  document.getElementById('dropoffGeoTag').style.display = r.dropoff_lat ? 'inline' : 'none';
   document.getElementById('editStatus').value = r.status;
   document.getElementById('editNotes').value = r.notes || '';
 
@@ -358,11 +399,20 @@ async function saveEdit() {
 
   const newStatus = document.getElementById('editStatus').value;
   const oldReq = allRequests.find(r => r.id === id);
+  const pickupLat = parseFloat(document.getElementById('editPickupLat').value) || null;
+  const pickupLng = parseFloat(document.getElementById('editPickupLng').value) || null;
+  const dropoffLat = parseFloat(document.getElementById('editDropoffLat').value) || null;
+  const dropoffLng = parseFloat(document.getElementById('editDropoffLng').value) || null;
+
   const updates = {
     passenger_name: document.getElementById('editName').value.trim(),
     passenger_phone: document.getElementById('editPhone').value.trim(),
     pickup_location: document.getElementById('editPickup').value.trim(),
     dropoff_location: document.getElementById('editDropoff').value.trim(),
+    pickup_lat: pickupLat,
+    pickup_lng: pickupLng,
+    dropoff_lat: dropoffLat,
+    dropoff_lng: dropoffLng,
     pickup_time: pickupUTC.toISOString(),
     status: newStatus,
     notes: document.getElementById('editNotes').value.trim() || null,
@@ -377,18 +427,25 @@ async function saveEdit() {
 
   const { error } = await sb.from('sxsw_ada_requests').update(updates).eq('id', id);
   if (error) { alert('Error saving changes.'); console.error(error); return; }
+  if (oldReq && newStatus !== oldReq.status) {
+    const slackEvents = { claimed: 'ada_claimed', picked_up: 'ada_picked_up', dropped_off: 'ada_dropped_off', cancelled: 'ada_cancelled' };
+    const evt = slackEvents[newStatus];
+    if (evt) notifySlack(evt, { shuttle_num: oldReq.shuttle_num, passenger_name: updates.passenger_name, pickup_location: updates.pickup_location, dropoff_location: updates.dropoff_location });
+  }
   closeModal();
 }
 
 /* ── Cancel ── */
 async function cancelRequest(id) {
   if (!confirm('Cancel this request?')) return;
+  const req = allRequests.find(r => r.id === id);
   const { error } = await sb.from('sxsw_ada_requests').update({
     status: 'cancelled',
     cancelled_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }).eq('id', id);
-  if (error) { alert('Error cancelling.'); console.error(error); }
+  if (error) { alert('Error cancelling.'); console.error(error); return; }
+  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
 }
 
 /* ── Helpers ── */
@@ -413,6 +470,76 @@ function formatDateTime(iso) {
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function notifySlack(event_type, data) {
+  fetch('/api/slack-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_type, data })
+  }).catch(() => {});
+}
+
+/* ── Mapbox Autocomplete ── */
+const MAPBOX_TOKEN = '__MAPBOX_TOKEN__';
+let acDebounce = {};
+
+function onAddressInput(field) {
+  const input = document.getElementById(field === 'pickup' ? 'editPickup' : 'editDropoff');
+  const query = input.value.trim();
+
+  // Clear lat/lng when user types (invalidate previous geocode)
+  document.getElementById(field === 'pickup' ? 'editPickupLat' : 'editDropoffLat').value = '';
+  document.getElementById(field === 'pickup' ? 'editPickupLng' : 'editDropoffLng').value = '';
+  document.getElementById(field === 'pickup' ? 'pickupGeoTag' : 'dropoffGeoTag').style.display = 'none';
+
+  clearTimeout(acDebounce[field]);
+  if (query.length < 3) { hideSuggestions(field); return; }
+
+  acDebounce[field] = setTimeout(() => fetchSuggestions(field, query), 300);
+}
+
+async function fetchSuggestions(field, query) {
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&proximity=-97.74,30.26&bbox=-97.90,30.15,-97.60,30.40&limit=5&types=address,poi`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const listEl = document.getElementById(field === 'pickup' ? 'pickupSuggestions' : 'dropoffSuggestions');
+    if (!data.features || !data.features.length) { hideSuggestions(field); return; }
+    listEl.innerHTML = data.features.map((f, i) =>
+      `<div class="autocomplete-item" onclick="selectSuggestion('${field}', ${i})">${esc(f.place_name)}</div>`
+    ).join('');
+    listEl.classList.add('show');
+    listEl._features = data.features;
+  } catch (e) { console.error('Geocode error:', e); }
+}
+
+function selectSuggestion(field, idx) {
+  const listEl = document.getElementById(field === 'pickup' ? 'pickupSuggestions' : 'dropoffSuggestions');
+  const feature = listEl._features[idx];
+  const input = document.getElementById(field === 'pickup' ? 'editPickup' : 'editDropoff');
+  input.value = feature.place_name;
+  document.getElementById(field === 'pickup' ? 'editPickupLng' : 'editDropoffLng').value = feature.center[0];
+  document.getElementById(field === 'pickup' ? 'editPickupLat' : 'editDropoffLat').value = feature.center[1];
+  document.getElementById(field === 'pickup' ? 'pickupGeoTag' : 'dropoffGeoTag').style.display = 'inline';
+  hideSuggestions(field);
+}
+
+function hideSuggestions(field) {
+  document.getElementById(field === 'pickup' ? 'pickupSuggestions' : 'dropoffSuggestions').classList.remove('show');
+}
+
+// Close suggestions on click outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.autocomplete-wrap')) {
+    hideSuggestions('pickup');
+    hideSuggestions('dropoff');
+  }
+});
+
+function isStaleEta(r) {
+  if (!r.eta_updated_at) return true;
+  return (Date.now() - new Date(r.eta_updated_at).getTime()) > 5 * 60 * 1000;
 }
 </script>
 </body>

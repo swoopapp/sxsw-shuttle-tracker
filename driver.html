@@ -523,6 +523,7 @@ function selectShuttle(shuttle) {
   document.getElementById('changeShuttle').style.display = '';
   document.getElementById('shuttleLabel').textContent = shuttle.name;
   document.getElementById('shuttleLabel').style.color = SHUTTLE_COLORS[(shuttle.num - 1) % 12];
+  notifySlack('driver_online', { shuttle_num: shuttle.num, shuttle_type: shuttle.ada ? 'ada' : 'standard' });
   startVehicleGPS();
   logStatus();
 }
@@ -1023,6 +1024,14 @@ function updateRecenterBtn() {
 }
 
 // ── UI update ──
+function notifySlack(event_type, data) {
+  fetch('/api/slack-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_type, data })
+  }).catch(() => {});
+}
+
 function updateUI() {
   const night = isNightMode();
   const route = getActiveRoute();

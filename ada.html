@@ -78,6 +78,8 @@
   .request-detail { font-size: 12px; color: #888; margin-bottom: 4px; display: flex; align-items: flex-start; gap: 6px; }
   .request-detail span.label { color: #555; min-width: 60px; flex-shrink: 0; }
   .request-shuttle { font-size: 11px; color: #60a5fa; margin-top: 6px; }
+  .eta-badge { font-size: 12px; font-weight: 700; color: #22c55e; margin-top: 4px; }
+  .eta-badge.stale { color: #888; }
   .empty-state { text-align: center; padding: 40px 20px; color: #444; font-size: 13px; }
 
   @media (max-width: 640px) {
@@ -231,6 +233,14 @@ async function submitRequest(e) {
 
   if (error) { alert('Error submitting request. Please try again.'); console.error(error); return; }
 
+  notifySlack('ada_new_request', {
+    passenger_name: record.passenger_name,
+    pickup_location: record.pickup_location,
+    dropoff_location: record.dropoff_location,
+    pickup_time: document.getElementById('pickupTime').value,
+    notes: record.notes
+  });
+
   document.getElementById('requestForm').reset();
   // Reset time to now
   const now = new Date();
@@ -281,7 +291,8 @@ function renderCard(r) {
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}${r.eta_minutes != null && r.status === 'claimed' ? ` · ETA ${r.eta_minutes} min` : ''}</div>` : ''}
+      ${r.eta_minutes != null && r.status === 'claimed' && !r.shuttle_num ? `<div class="eta-badge">ETA ${r.eta_minutes} min</div>` : ''}
     </div>`;
 }
 
@@ -294,6 +305,14 @@ function formatTime(iso) {
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function notifySlack(event_type, data) {
+  fetch('/api/slack-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_type, data })
+  }).catch(() => {});
 }
 </script>
 </body>

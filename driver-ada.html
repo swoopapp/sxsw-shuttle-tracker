@@ -127,6 +127,14 @@
   .completed-card {
     opacity: 0.5;
   }
+
+  /* ── ETA badge ── */
+  .eta-badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700;
+    color: #22c55e; margin-top: 8px;
+  }
+  .eta-badge.stale { color: #888; }
+  .eta-label { font-size: 11px; color: #666; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -166,9 +174,16 @@ const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const MAPBOX_TOKEN = '__MAPBOX_TOKEN__';
+const MAPSINDOORS_API = 'https://liveapi.mapsindoors.com/api/state';
+const MAPSINDOORS_SOLUTION = '6b2dab7ddae2420da0b707dd';
+const SHUTTLE_MI_IDS = { 1: 'e9525829c53340b4b6bcf62e', 2: '3fbe7b87b2514cf88dd2959b' };
+const ETA_POLL_MS = 2 * 60 * 1000; // 2 minutes
+
 let shuttleNum = null;
 let allRequests = [];
 let currentTab = 'available';
+let etaInterval = null;
 
 /* ── Init ── */
 (function init() {
@@ -198,6 +213,71 @@ async function showApp() {
   document.getElementById('shuttleTag').textContent = `Shuttle ${shuttleNum}`;
   await loadRequests();
   subscribeRealtime();
+  startEtaPolling();
+}
+
+/* ── ETA Polling ── */
+function startEtaPolling() {
+  if (etaInterval) clearInterval(etaInterval);
+  updateEta(); // run immediately
+  etaInterval = setInterval(updateEta, ETA_POLL_MS);
+}
+
+async function updateEta() {
+  // Find active claimed trips for this shuttle that have pickup coordinates
+  const activeTrips = allRequests.filter(r =>
+    r.shuttle_num === shuttleNum && r.status === 'claimed' && r.pickup_lat && r.pickup_lng
+  );
+  if (!activeTrips.length) return;
+
+  // Get shuttle GPS from MapsIndoors
+  const miId = SHUTTLE_MI_IDS[shuttleNum];
+  if (!miId) return;
+
+  try {
+    const topic = `${MAPSINDOORS_SOLUTION}/+/+/+/+/${miId}/position`;
+    const res = await fetch(MAPSINDOORS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topics: [topic] })
+    });
+    const data = await res.json();
+    if (!data || !data.length) return;
+
+    const pos = data[0];
+    const coords = pos.data?.coordinates || pos.coordinates;
+    if (!coords) return;
+
+    const driverLat = coords.latitude;
+    const driverLng = coords.longitude;
+    if (!driverLat || !driverLng) return;
+
+    // Calculate ETA for each active trip
+    for (const trip of activeTrips) {
+      await calculateAndSaveEta(trip, driverLat, driverLng);
+    }
+  } catch (e) {
+    console.error('ETA update error:', e);
+  }
+}
+
+async function calculateAndSaveEta(trip, driverLat, driverLng) {
+  try {
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLng},${driverLat};${trip.pickup_lng},${trip.pickup_lat}?access_token=${MAPBOX_TOKEN}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) return;
+
+    const durationSec = data.routes[0].duration;
+    const etaMinutes = Math.max(1, Math.round(durationSec / 60));
+
+    await sb.from('sxsw_ada_requests').update({
+      eta_minutes: etaMinutes,
+      eta_updated_at: new Date().toISOString()
+    }).eq('id', trip.id);
+  } catch (e) {
+    console.error('Directions API error:', e);
+  }
 }
 
 /* ── Load ── */
@@ -250,6 +330,8 @@ async function claimTrip(id) {
     updated_at: new Date().toISOString()
   }).eq('id', id);
   if (error) { alert('Error claiming trip.'); console.error(error); btn.disabled = false; btn.textContent = 'CLAIM TRIP'; return; }
+  const req = allRequests.find(r => r.id === id);
+  if (req) notifySlack('ada_claimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
   currentTab = 'mytrip';
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tabMyTrip').classList.add('active');
@@ -263,7 +345,9 @@ async function markPickedUp(id) {
     picked_up_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }).eq('id', id);
-  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'PICKED UP'; }
+  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'PICKED UP'; return; }
+  const req = allRequests.find(r => r.id === id);
+  if (req) notifySlack('ada_picked_up', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location });
 }
 
 async function markDroppedOff(id) {
@@ -274,7 +358,9 @@ async function markDroppedOff(id) {
     dropped_off_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }).eq('id', id);
-  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'DROPPED OFF'; }
+  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'DROPPED OFF'; return; }
+  const req = allRequests.find(r => r.id === id);
+  if (req) notifySlack('ada_dropped_off', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, dropoff_location: req.dropoff_location });
 }
 
 /* ── Render ── */
@@ -353,6 +439,7 @@ function renderMyTripCard(r) {
       <div class="request-detail"><span class="label">Time</span> <span class="value">${time}</span></div>
       ${r.notes ? `<div class="request-notes">${esc(r.notes)}</div>` : ''}
       <a href="tel:${esc(r.passenger_phone)}" class="request-phone-link">${esc(r.passenger_phone)}</a>
+      ${isClaimed && r.eta_minutes != null ? `<div class="eta-badge${isStaleEta(r) ? ' stale' : ''}"><span class="eta-label">ETA to pickup:</span> ${r.eta_minutes} min</div>` : ''}
       <div class="trip-actions">
         ${isClaimed ? `<button class="trip-btn pickup" onclick="markPickedUp('${r.id}')">PICKED UP</button>` : ''}
         ${isPickedUp ? `<button class="trip-btn dropoff" onclick="markDroppedOff('${r.id}')">DROPPED OFF</button>` : ''}
@@ -390,6 +477,19 @@ function formatDateTime(iso) {
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function isStaleEta(r) {
+  if (!r.eta_updated_at) return true;
+  return (Date.now() - new Date(r.eta_updated_at).getTime()) > 5 * 60 * 1000;
+}
+
+function notifySlack(event_type, data) {
+  fetch('/api/slack-notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_type, data })
+  }).catch(() => {});
 }
 </script>
 </body>
