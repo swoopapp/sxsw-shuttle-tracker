@@ -1385,8 +1385,6 @@ function startWalking() {
 // ── Static route traces from official SXSW shuttle map PDF ──
 // Coordinates [lng, lat] traced at every turn along the actual streets
 // ── Render route lines via Mapbox Directions API (actual roads) ──
-let lastRouteKey = null;
-let routeCache = {}; // cache fetched routes by key
 
 // Hardcoded orange (day) route GeoJSON – exact path traced from the official map
 const ORANGE_ROUTE_GEOJSON = {
@@ -1431,64 +1429,64 @@ async function fetchRouteGeo(route) {
   return null;
 }
 
+function ensureRouteLayer(sourceId, lineId, arrowsId, geojson, color) {
+  if (map.getSource(sourceId)) {
+    map.getSource(sourceId).setData(geojson);
+  } else {
+    map.addSource(sourceId, { type: 'geojson', data: geojson });
+    map.addLayer({
+      id: lineId,
+      type: 'line',
+      source: sourceId,
+      paint: { 'line-color': color, 'line-width': 4, 'line-opacity': 0.6 }
+    });
+    map.addLayer({
+      id: arrowsId,
+      type: 'symbol',
+      source: sourceId,
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 80,
+        'text-field': '▶',
+        'text-size': 14,
+        'text-keep-upright': false,
+        'text-rotation-alignment': 'map',
+        'text-allow-overlap': true,
+        'text-ignore-placement': true
+      },
+      paint: { 'text-color': color, 'text-halo-color': '#ffffff', 'text-halo-width': 1 }
+    });
+  }
+  if (map.getLayer(lineId)) {
+    map.setPaintProperty(lineId, 'line-color', color);
+    map.setPaintProperty(arrowsId, 'text-color', color);
+  }
+}
+
+function removeRouteLayer(sourceId, lineId, arrowsId) {
+  if (map.getLayer(arrowsId)) map.removeLayer(arrowsId);
+  if (map.getLayer(lineId)) map.removeLayer(lineId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+}
+
+let lastNightState = null;
+
 async function renderRouteLines() {
   const night = isNightMode();
-  const route = getActiveRoute();
-  const routeKey = route.join(',');
-  const color = night ? '#16a34a' : '#ea580c';
 
-  if (routeKey !== lastRouteKey) {
-    lastRouteKey = routeKey;
+  if (night !== lastNightState) {
+    lastNightState = night;
 
-    let geojson;
-    if (!night) {
-      // Use hardcoded orange route GeoJSON
-      geojson = ORANGE_ROUTE_GEOJSON;
+    // Always show orange route
+    ensureRouteLayer('route', 'route-line', 'route-arrows', ORANGE_ROUTE_GEOJSON, '#ea580c');
+
+    if (night) {
+      // Night mode: also show green route
+      ensureRouteLayer('route-green', 'route-green-line', 'route-green-arrows', GREEN_ROUTE_GEOJSON, '#16a34a');
     } else {
-      // Use hardcoded green route GeoJSON
-      geojson = GREEN_ROUTE_GEOJSON;
+      // Day mode: remove green route if present
+      removeRouteLayer('route-green', 'route-green-line', 'route-green-arrows');
     }
-
-    if (map.getSource('route')) {
-      map.getSource('route').setData(geojson);
-    } else {
-      map.addSource('route', { type: 'geojson', data: geojson });
-      map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        paint: {
-          'line-color': color,
-          'line-width': 4,
-          'line-opacity': 0.6
-        }
-      });
-      map.addLayer({
-        id: 'route-arrows',
-        type: 'symbol',
-        source: 'route',
-        layout: {
-          'symbol-placement': 'line',
-          'symbol-spacing': 80,
-          'text-field': '▶',
-          'text-size': 14,
-          'text-keep-upright': false,
-          'text-rotation-alignment': 'map',
-          'text-allow-overlap': true,
-          'text-ignore-placement': true
-        },
-        paint: {
-          'text-color': color,
-          'text-halo-color': '#ffffff',
-          'text-halo-width': 1
-        }
-      });
-    }
-  }
-
-  if (map.getLayer('route-line')) {
-    map.setPaintProperty('route-line', 'line-color', color);
-    map.setPaintProperty('route-arrows', 'text-color', color);
   }
 }
 
