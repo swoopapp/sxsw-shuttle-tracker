@@ -272,11 +272,11 @@
 
   <!-- Filter Bar -->
   <div class="filter-bar" id="filterBar">
-    <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All <span class="filter-count" id="fcAll">0</span></button>
-    <button class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">Waiting <span class="filter-count" id="fcPending">0</span></button>
+    <button class="filter-btn active" data-filter="pending" onclick="setFilter('pending', this)">Waiting <span class="filter-count" id="fcPending">0</span></button>
     <button class="filter-btn" data-filter="in_progress" onclick="setFilter('in_progress', this)">In Progress <span class="filter-count" id="fcProgress">0</span></button>
     <button class="filter-btn" data-filter="completed" onclick="setFilter('completed', this)">Completed <span class="filter-count" id="fcDone">0</span></button>
     <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled', this)">Cancelled <span class="filter-count" id="fcCancelled">0</span></button>
+    <button class="filter-btn" data-filter="all" onclick="setFilter('all', this)">All <span class="filter-count" id="fcAll">0</span></button>
   </div>
 
   <!-- Last updated -->
@@ -465,7 +465,7 @@ function updateStatusDot() {
 }
 
 let allRequests = [];
-let currentFilter = 'all';
+let currentFilter = 'pending';
 
 /* ── Init ── */
 (async function init() {
