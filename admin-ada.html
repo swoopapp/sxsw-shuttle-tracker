@@ -546,6 +546,74 @@ function isStaleEta(r) {
   if (!r.eta_updated_at) return true;
   return (Date.now() - new Date(r.eta_updated_at).getTime()) > 5 * 60 * 1000;
 }
+
+/* ── ETA Calculation (runs from admin dashboard) ── */
+const MAPSINDOORS_API = 'https://liveapi.mapsindoors.com/api/state';
+const MAPSINDOORS_SOLUTION = '6b2dab7ddae2420da0b707dd';
+const SHUTTLE_MI_IDS = { 1: 'e9525829c53340b4b6bcf62e', 2: '3fbe7b87b2514cf88dd2959b' };
+const ETA_POLL_MS = 2 * 60 * 1000; // 2 minutes
+
+// Start ETA polling on load
+(function startEtaPolling() {
+  updateAllEtas();
+  setInterval(updateAllEtas, ETA_POLL_MS);
+})();
+
+async function updateAllEtas() {
+  // Find all claimed/picked_up trips with geocoded pickup coordinates
+  const activeTrips = allRequests.filter(r =>
+    ['claimed', 'picked_up'].includes(r.status) && r.shuttle_num && r.pickup_lat && r.pickup_lng
+  );
+  if (!activeTrips.length) return;
+
+  // Group trips by shuttle to minimize MapsIndoors calls
+  const byShuttle = {};
+  for (const trip of activeTrips) {
+    if (!byShuttle[trip.shuttle_num]) byShuttle[trip.shuttle_num] = [];
+    byShuttle[trip.shuttle_num].push(trip);
+  }
+
+  for (const [shuttleNum, trips] of Object.entries(byShuttle)) {
+    const miId = SHUTTLE_MI_IDS[shuttleNum];
+    if (!miId) continue;
+
+    try {
+      // Get shuttle GPS from MapsIndoors
+      const topic = `${MAPSINDOORS_SOLUTION}/+/+/+/+/${miId}/position`;
+      const res = await fetch(MAPSINDOORS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: [topic] })
+      });
+      const data = await res.json();
+      if (!data || !data.length) continue;
+
+      const pos = data[0];
+      const coords = pos.data?.coordinates || pos.coordinates;
+      if (!coords || !coords.latitude || !coords.longitude) continue;
+
+      const driverLat = coords.latitude;
+      const driverLng = coords.longitude;
+
+      // Calculate ETA for each trip on this shuttle
+      for (const trip of trips) {
+        try {
+          const dirUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLng},${driverLat};${trip.pickup_lng},${trip.pickup_lat}?access_token=${MAPBOX_TOKEN}`;
+          const dirRes = await fetch(dirUrl);
+          const dirData = await dirRes.json();
+          if (!dirData.routes || !dirData.routes.length) continue;
+
+          const etaMinutes = Math.max(1, Math.round(dirData.routes[0].duration / 60));
+
+          await sb.from('sxsw_ada_requests').update({
+            eta_minutes: etaMinutes,
+            eta_updated_at: new Date().toISOString()
+          }).eq('id', trip.id);
+        } catch (e) { console.error('Directions error for trip', trip.trip_number, e); }
+      }
+    } catch (e) { console.error('MapsIndoors error for shuttle', shuttleNum, e); }
+  }
+}
 </script>
 </body>
 </html>
