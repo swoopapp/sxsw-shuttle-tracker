@@ -175,8 +175,8 @@
 
   <!-- Filter Bar -->
   <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('all')">All</button>
-    <button class="filter-btn" onclick="setFilter('pending')">Pending</button>
+    <button class="filter-btn" onclick="setFilter('all')">All</button>
+    <button class="filter-btn active" onclick="setFilter('pending')">Pending</button>
     <button class="filter-btn" onclick="setFilter('in_progress')">In Progress</button>
     <button class="filter-btn" onclick="setFilter('completed')">Completed</button>
     <button class="filter-btn" onclick="setFilter('cancelled')">Cancelled</button>
@@ -252,7 +252,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let allRequests = [];
-let currentFilter = 'all';
+let currentFilter = 'pending';
 
 /* ── Init ── */
 (async function init() {
