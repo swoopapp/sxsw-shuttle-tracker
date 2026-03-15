@@ -465,7 +465,7 @@ function renderCard(r) {
       <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
       <div class="request-detail"><span class="label">Time</span> ${time}</div>
       ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
-      ${r.status === 'pending' ? `<button class="cancel-btn" onclick="cancelRequest('${r.id}')">Cancel Request</button>` : ''}
+      ${['pending','claimed'].includes(r.status) ? `<button class="cancel-btn" onclick="cancelRequest('${r.id}')">Cancel Request</button>` : ''}
     </div>`;
 }
 
