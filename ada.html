@@ -242,7 +242,8 @@ async function submitRequest(e) {
       pickup_location: record.pickup_location,
       dropoff_location: record.dropoff_location,
       pickup_time: document.getElementById('pickupTime').value,
-      notes: record.notes
+      notes: record.notes,
+      trip_number: row.trip_number
     }).then(slackTs => {
       if (slackTs) sb.from('sxsw_ada_requests').update({ slack_thread_ts: slackTs }).eq('id', row.id).then(() => {});
     });

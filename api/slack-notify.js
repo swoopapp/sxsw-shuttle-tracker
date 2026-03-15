@@ -50,9 +50,10 @@ function formatSlackMessage(event_type, data) {
 
     // ── ADA Request Events ──
 
-    case 'ada_new_request':
+    case 'ada_new_request': {
+      const tripLabel = data.trip_number ? ` · Trip #${data.trip_number}` : '';
       blocks.push(
-        section(`*New ADA Request* :wheelchair:\n*${data.passenger_name}* requested a ride`),
+        section(`*New ADA Request${tripLabel}* :wheelchair:\n*${data.passenger_name}* requested a ride`),
         section(
           `*Pickup:* ${data.pickup_location}\n` +
           `*Drop-off:* ${data.dropoff_location}\n` +
@@ -61,35 +62,44 @@ function formatSlackMessage(event_type, data) {
         ),
         context(`Submitted at ${ts} CT`)
       );
-      return { blocks, text: `New ADA request from ${data.passenger_name}` };
+      return { blocks, text: `New ADA request${tripLabel} from ${data.passenger_name}` };
+    }
 
-    case 'ada_claimed':
+    case 'ada_claimed': {
+      const tn = data.trip_number ? ` #${data.trip_number}` : '';
       blocks.push(
-        section(`*Trip Claimed* :blue_car:\n*Shuttle ${data.shuttle_num}* claimed the trip for *${data.passenger_name}*`),
+        section(`*Trip${tn} Claimed* :blue_car:\n*Shuttle ${data.shuttle_num}* claimed the trip for *${data.passenger_name}*`),
         context(`Claimed at ${ts} CT`)
       );
-      return { blocks, text: `Shuttle ${data.shuttle_num} claimed trip for ${data.passenger_name}` };
+      return { blocks, text: `Shuttle ${data.shuttle_num} claimed trip${tn} for ${data.passenger_name}` };
+    }
 
-    case 'ada_picked_up':
+    case 'ada_picked_up': {
+      const tn = data.trip_number ? ` (Trip #${data.trip_number})` : '';
       blocks.push(
-        section(`*Passenger Picked Up* :busstop:\n*Shuttle ${data.shuttle_num}* picked up *${data.passenger_name}*`),
+        section(`*Passenger Picked Up${tn}* :busstop:\n*Shuttle ${data.shuttle_num}* picked up *${data.passenger_name}*`),
         context(`Picked up at ${ts} CT`)
       );
-      return { blocks, text: `Shuttle ${data.shuttle_num} picked up ${data.passenger_name}` };
+      return { blocks, text: `Shuttle ${data.shuttle_num} picked up ${data.passenger_name}${tn}` };
+    }
 
-    case 'ada_dropped_off':
+    case 'ada_dropped_off': {
+      const tn = data.trip_number ? ` #${data.trip_number}` : '';
       blocks.push(
-        section(`*Trip Complete* :white_check_mark:\n*Shuttle ${data.shuttle_num}* dropped off *${data.passenger_name}* at *${data.dropoff_location}*`),
+        section(`*Trip${tn} Complete* :white_check_mark:\n*Shuttle ${data.shuttle_num}* dropped off *${data.passenger_name}* at *${data.dropoff_location}*`),
         context(`Completed at ${ts} CT`)
       );
-      return { blocks, text: `Shuttle ${data.shuttle_num} dropped off ${data.passenger_name}` };
+      return { blocks, text: `Shuttle ${data.shuttle_num} dropped off ${data.passenger_name}${tn}` };
+    }
 
-    case 'ada_cancelled':
+    case 'ada_cancelled': {
+      const tn = data.trip_number ? ` #${data.trip_number}` : '';
       blocks.push(
-        section(`*Request Cancelled* :x:\nTrip for *${data.passenger_name}* was cancelled`),
+        section(`*Request${tn} Cancelled* :x:\nTrip for *${data.passenger_name}* was cancelled`),
         context(`Cancelled at ${ts} CT`)
       );
-      return { blocks, text: `ADA request for ${data.passenger_name} cancelled` };
+      return { blocks, text: `ADA request${tn} for ${data.passenger_name} cancelled` };
+    }
 
     // ── Driver Events ──
 

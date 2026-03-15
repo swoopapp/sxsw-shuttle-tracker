@@ -433,7 +433,7 @@ async function saveEdit() {
   if (oldReq && newStatus !== oldReq.status) {
     const slackEvents = { claimed: 'ada_claimed', picked_up: 'ada_picked_up', dropped_off: 'ada_dropped_off', cancelled: 'ada_cancelled' };
     const evt = slackEvents[newStatus];
-    if (evt) notifySlack(evt, { shuttle_num: oldReq.shuttle_num, passenger_name: updates.passenger_name, pickup_location: updates.pickup_location, dropoff_location: updates.dropoff_location, slack_thread_ts: oldReq.slack_thread_ts });
+    if (evt) notifySlack(evt, { shuttle_num: oldReq.shuttle_num, passenger_name: updates.passenger_name, pickup_location: updates.pickup_location, dropoff_location: updates.dropoff_location, slack_thread_ts: oldReq.slack_thread_ts, trip_number: oldReq.trip_number });
   }
   closeModal();
 }
@@ -448,7 +448,7 @@ async function cancelRequest(id) {
     updated_at: new Date().toISOString()
   }).eq('id', id);
   if (error) { alert('Error cancelling.'); console.error(error); return; }
-  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
+  if (req) notifySlack('ada_cancelled', { passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
 }
 
 /* ── Helpers ── */

@@ -332,7 +332,7 @@ async function claimTrip(id) {
   }).eq('id', id);
   if (error) { alert('Error claiming trip.'); console.error(error); btn.disabled = false; btn.textContent = 'CLAIM TRIP'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_claimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
+  if (req) notifySlack('ada_claimed', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
   currentTab = 'mytrip';
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tabMyTrip').classList.add('active');
@@ -348,7 +348,7 @@ async function markPickedUp(id) {
   }).eq('id', id);
   if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'PICKED UP'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_picked_up', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
+  if (req) notifySlack('ada_picked_up', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, pickup_location: req.pickup_location, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
 }
 
 async function markDroppedOff(id) {
@@ -361,7 +361,7 @@ async function markDroppedOff(id) {
   }).eq('id', id);
   if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'DROPPED OFF'; return; }
   const req = allRequests.find(r => r.id === id);
-  if (req) notifySlack('ada_dropped_off', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts });
+  if (req) notifySlack('ada_dropped_off', { shuttle_num: shuttleNum, passenger_name: req.passenger_name, dropoff_location: req.dropoff_location, slack_thread_ts: req.slack_thread_ts, trip_number: req.trip_number });
 }
 
 /* ── Render ── */
