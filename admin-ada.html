@@ -258,6 +258,9 @@ let currentFilter = 'pending';
 (async function init() {
   await loadRequests();
   subscribeRealtime();
+  // Start ETA polling AFTER data is loaded
+  updateAllEtas();
+  setInterval(updateAllEtas, ETA_POLL_MS);
 })();
 
 /* ── Load ── */
@@ -553,18 +556,14 @@ const MAPSINDOORS_SOLUTION = '6b2dab7ddae2420da0b707dd';
 const SHUTTLE_MI_IDS = { 1: 'e9525829c53340b4b6bcf62e', 2: '3fbe7b87b2514cf88dd2959b' };
 const ETA_POLL_MS = 2 * 60 * 1000; // 2 minutes
 
-// Start ETA polling on load
-(function startEtaPolling() {
-  updateAllEtas();
-  setInterval(updateAllEtas, ETA_POLL_MS);
-})();
-
 async function updateAllEtas() {
   // Find all claimed/picked_up trips with geocoded pickup coordinates
   const activeTrips = allRequests.filter(r =>
     ['claimed', 'picked_up'].includes(r.status) && r.shuttle_num && r.pickup_lat && r.pickup_lng
   );
-  if (!activeTrips.length) return;
+  if (!activeTrips.length) { console.log('[ETA] No active trips with coordinates'); return; }
+
+  console.log('[ETA] Calculating for', activeTrips.length, 'trip(s)');
 
   // Group trips by shuttle to minimize MapsIndoors calls
   const byShuttle = {};
@@ -575,7 +574,7 @@ async function updateAllEtas() {
 
   for (const [shuttleNum, trips] of Object.entries(byShuttle)) {
     const miId = SHUTTLE_MI_IDS[shuttleNum];
-    if (!miId) continue;
+    if (!miId) { console.warn('[ETA] No MapsIndoors ID for shuttle', shuttleNum); continue; }
 
     try {
       // Get shuttle GPS from MapsIndoors
@@ -586,14 +585,17 @@ async function updateAllEtas() {
         body: JSON.stringify({ topics: [topic] })
       });
       const data = await res.json();
-      if (!data || !data.length) continue;
+      console.log('[ETA] MapsIndoors response for shuttle', shuttleNum, ':', JSON.stringify(data).slice(0, 200));
+
+      if (!data || !data.length) { console.warn('[ETA] No GPS data from MapsIndoors for shuttle', shuttleNum); continue; }
 
       const pos = data[0];
       const coords = pos.data?.coordinates || pos.coordinates;
-      if (!coords || !coords.latitude || !coords.longitude) continue;
+      if (!coords || !coords.latitude || !coords.longitude) { console.warn('[ETA] No coordinates in response for shuttle', shuttleNum, pos); continue; }
 
       const driverLat = coords.latitude;
       const driverLng = coords.longitude;
+      console.log('[ETA] Shuttle', shuttleNum, 'at', driverLat, driverLng);
 
       // Calculate ETA for each trip on this shuttle
       for (const trip of trips) {
@@ -601,17 +603,18 @@ async function updateAllEtas() {
           const dirUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${driverLng},${driverLat};${trip.pickup_lng},${trip.pickup_lat}?access_token=${MAPBOX_TOKEN}`;
           const dirRes = await fetch(dirUrl);
           const dirData = await dirRes.json();
-          if (!dirData.routes || !dirData.routes.length) continue;
+          if (!dirData.routes || !dirData.routes.length) { console.warn('[ETA] No route found for trip', trip.trip_number); continue; }
 
           const etaMinutes = Math.max(1, Math.round(dirData.routes[0].duration / 60));
+          console.log('[ETA] Trip #' + trip.trip_number + ': ' + etaMinutes + ' min');
 
           await sb.from('sxsw_ada_requests').update({
             eta_minutes: etaMinutes,
             eta_updated_at: new Date().toISOString()
           }).eq('id', trip.id);
-        } catch (e) { console.error('Directions error for trip', trip.trip_number, e); }
+        } catch (e) { console.error('[ETA] Directions error for trip', trip.trip_number, e); }
       }
-    } catch (e) { console.error('MapsIndoors error for shuttle', shuttleNum, e); }
+    } catch (e) { console.error('[ETA] MapsIndoors error for shuttle', shuttleNum, e); }
   }
 }
 </script>
