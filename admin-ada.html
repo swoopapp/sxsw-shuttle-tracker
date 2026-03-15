@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SXSW ADA Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px; background: rgba(15,15,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px);
+  }
+  .top-bar h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
+  .top-bar-left { display: flex; align-items: center; gap: 12px; }
+  .top-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ada-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .nav-link { color: #6366f1; font-size: 11px; text-decoration: none; }
+  .nav-link:hover { color: #a5b4fc; }
+  .filter-btn {
+    padding: 5px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
+    background: rgba(255,255,255,0.03); color: #777; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .filter-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .filter-btn.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+
+  /* ── Container ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ── Stats Row ── */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .stat-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 14px 16px; text-align: center;
+  }
+  .stat-val { font-size: 24px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .stat-val.pending { color: #facc15; }
+  .stat-val.active { color: #60a5fa; }
+  .stat-val.done { color: #22c55e; }
+
+  /* ── Filter Bar ── */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  /* ── Section ── */
+  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .section-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+  .section-count { font-size: 11px; color: #555; }
+
+  /* ── Request Cards ── */
+  .request-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 16px 18px; margin-bottom: 10px; transition: border-color 0.15s;
+  }
+  .request-card:hover { border-color: rgba(255,255,255,0.12); }
+  .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .request-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .request-phone { font-size: 12px; color: #888; margin-left: 8px; }
+  .status-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .status-pending { background: rgba(234,179,8,0.15); color: #facc15; }
+  .status-claimed { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .status-picked_up { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .status-dropped_off { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .request-detail { font-size: 12px; color: #888; margin-bottom: 3px; display: flex; align-items: flex-start; gap: 6px; }
+  .request-detail span.label { color: #555; min-width: 60px; flex-shrink: 0; }
+  .request-shuttle { font-size: 11px; color: #60a5fa; margin-top: 6px; }
+  .request-meta { font-size: 10px; color: #444; margin-top: 8px; }
+  .request-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .action-btn {
+    padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.15s;
+  }
+  .action-btn.edit { background: rgba(99,102,241,0.12); color: #a5b4fc; border-color: rgba(99,102,241,0.2); }
+  .action-btn.edit:hover { background: rgba(99,102,241,0.25); }
+  .action-btn.cancel { background: rgba(239,68,68,0.1); color: #f87171; border-color: rgba(239,68,68,0.2); }
+  .action-btn.cancel:hover { background: rgba(239,68,68,0.2); }
+  .empty-state { text-align: center; padding: 40px 20px; color: #444; font-size: 13px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+    justify-content: center; align-items: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+    padding: 24px; width: 100%; max-width: 440px;
+  }
+  .modal-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 16px; }
+  .modal .field { margin-bottom: 14px; }
+  .modal .field label { display: block; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .modal .field input, .modal .field textarea, .modal .field select {
+    width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: #fff; font-size: 14px; font-family: inherit; outline: none;
+  }
+  .modal .field textarea { resize: vertical; min-height: 60px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-btn {
+    flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .modal-btn.save { background: #3b82f6; color: #fff; }
+  .modal-btn.save:hover { background: #2563eb; }
+  .modal-btn.close { background: rgba(255,255,255,0.06); color: #888; }
+  .modal-btn.close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  /* ── Connection indicator ── */
+  .conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .conn-dot.on { background: #22c55e; }
+  .conn-dot.off { background: #ef4444; }
+  .conn-label { font-size: 10px; color: #555; }
+
+  @media (max-width: 640px) {
+    .container { padding: 16px; }
+    .top-bar { padding: 12px 16px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-bar-left">
+    <h1>ADA Dashboard</h1>
+    <span class="ada-badge">ADMIN</span>
+    <span><span class="conn-dot" id="connDot"></span><span class="conn-label" id="connLabel">connecting...</span></span>
+  </div>
+  <div class="top-bar-right">
+    <a href="/ada" class="nav-link">Request Page</a>
+    <a href="/admin" class="nav-link">Main Dashboard</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="statTotal">0</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-val pending" id="statPending">0</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-val active" id="statActive">0</div><div class="stat-label">In Progress</div></div>
+    <div class="stat-card"><div class="stat-val done" id="statDone">0</div><div class="stat-label">Completed</div></div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all')">All</button>
+    <button class="filter-btn" onclick="setFilter('pending')">Pending</button>
+    <button class="filter-btn" onclick="setFilter('in_progress')">In Progress</button>
+    <button class="filter-btn" onclick="setFilter('completed')">Completed</button>
+    <button class="filter-btn" onclick="setFilter('cancelled')">Cancelled</button>
+  </div>
+
+  <!-- Requests -->
+  <div class="section-header">
+    <div class="section-title">Requests</div>
+    <div class="section-count" id="filterCount"></div>
+  </div>
+  <div id="requestsList"></div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">Edit Request</div>
+    <input type="hidden" id="editId">
+    <div class="field">
+      <label>Passenger Name</label>
+      <input type="text" id="editName">
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="tel" id="editPhone">
+    </div>
+    <div class="field">
+      <label>Pickup Location</label>
+      <input type="text" id="editPickup">
+    </div>
+    <div class="field">
+      <label>Drop-off Location</label>
+      <input type="text" id="editDropoff">
+    </div>
+    <div class="field">
+      <label>Pickup Time</label>
+      <input type="time" id="editTime">
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="editStatus">
+        <option value="pending">Pending</option>
+        <option value="claimed">Claimed</option>
+        <option value="picked_up">Picked Up</option>
+        <option value="dropped_off">Dropped Off</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="editNotes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn close" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn save" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let allRequests = [];
+let currentFilter = 'all';
+
+/* ── Init ── */
+(async function init() {
+  await loadRequests();
+  subscribeRealtime();
+})();
+
+/* ── Load ── */
+async function loadRequests() {
+  const { data, error } = await sb
+    .from('sxsw_ada_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Load error:', error); return; }
+  allRequests = data || [];
+  render();
+}
+
+/* ── Realtime ── */
+function subscribeRealtime() {
+  const channel = sb.channel('ada-requests-admin')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sxsw_ada_requests' }, payload => {
+      if (payload.eventType === 'INSERT') {
+        allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = allRequests.findIndex(r => r.id === payload.new.id);
+        if (idx >= 0) allRequests[idx] = payload.new; else allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        allRequests = allRequests.filter(r => r.id !== payload.old.id);
+      }
+      render();
+    })
+    .subscribe((status) => {
+      const dot = document.getElementById('connDot');
+      const label = document.getElementById('connLabel');
+      if (status === 'SUBSCRIBED') {
+        dot.className = 'conn-dot on'; label.textContent = 'live';
+      } else {
+        dot.className = 'conn-dot off'; label.textContent = status.toLowerCase();
+      }
+    });
+}
+
+/* ── Filter ── */
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function getFiltered() {
+  if (currentFilter === 'all') return allRequests;
+  if (currentFilter === 'in_progress') return allRequests.filter(r => ['claimed','picked_up'].includes(r.status));
+  if (currentFilter === 'completed') return allRequests.filter(r => r.status === 'dropped_off');
+  return allRequests.filter(r => r.status === currentFilter);
+}
+
+/* ── Render ── */
+function render() {
+  // Stats
+  const pending = allRequests.filter(r => r.status === 'pending').length;
+  const inProgress = allRequests.filter(r => ['claimed','picked_up'].includes(r.status)).length;
+  const done = allRequests.filter(r => r.status === 'dropped_off').length;
+  document.getElementById('statTotal').textContent = allRequests.length;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statActive').textContent = inProgress;
+  document.getElementById('statDone').textContent = done;
+
+  // List
+  const filtered = getFiltered();
+  document.getElementById('filterCount').textContent = filtered.length ? `${filtered.length}` : '';
+  document.getElementById('requestsList').innerHTML = filtered.length
+    ? filtered.map(r => renderCard(r)).join('')
+    : '<div class="empty-state">No requests matching this filter</div>';
+}
+
+function renderCard(r) {
+  const statusLabels = { pending: 'Pending', claimed: 'Claimed', picked_up: 'Picked Up', dropped_off: 'Dropped Off', cancelled: 'Cancelled' };
+  const time = formatTime(r.pickup_time);
+  const created = formatDateTime(r.created_at);
+  const canEdit = ['pending','claimed','picked_up'].includes(r.status);
+  const canCancel = ['pending','claimed'].includes(r.status);
+
+  return `
+    <div class="request-card">
+      <div class="request-card-header">
+        <span>
+          <span class="request-name">${esc(r.passenger_name)}</span>
+          <span class="request-phone">${esc(r.passenger_phone)}</span>
+        </span>
+        <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
+      </div>
+      <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}</div>
+      <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
+      <div class="request-detail"><span class="label">Time</span> ${time}</div>
+      ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}</div>` : ''}
+      <div class="request-meta">Submitted ${created}${r.claimed_at ? ' · Claimed ' + formatDateTime(r.claimed_at) : ''}${r.picked_up_at ? ' · Picked up ' + formatDateTime(r.picked_up_at) : ''}${r.dropped_off_at ? ' · Dropped off ' + formatDateTime(r.dropped_off_at) : ''}</div>
+      ${canEdit || canCancel ? `
+        <div class="request-actions">
+          ${canEdit ? `<button class="action-btn edit" onclick="openEdit('${r.id}')">Edit</button>` : ''}
+          ${canCancel ? `<button class="action-btn cancel" onclick="cancelRequest('${r.id}')">Cancel</button>` : ''}
+        </div>` : ''}
+    </div>`;
+}
+
+/* ── Edit Modal ── */
+function openEdit(id) {
+  const r = allRequests.find(r => r.id === id);
+  if (!r) return;
+  document.getElementById('editId').value = r.id;
+  document.getElementById('editName').value = r.passenger_name;
+  document.getElementById('editPhone').value = r.passenger_phone;
+  document.getElementById('editPickup').value = r.pickup_location;
+  document.getElementById('editDropoff').value = r.dropoff_location;
+  document.getElementById('editStatus').value = r.status;
+  document.getElementById('editNotes').value = r.notes || '';
+
+  // Parse pickup time to CT
+  const d = new Date(r.pickup_time);
+  const ct = new Date(d.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  document.getElementById('editTime').value = `${String(ct.getHours()).padStart(2,'0')}:${String(ct.getMinutes()).padStart(2,'0')}`;
+
+  document.getElementById('editModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('editModal').classList.remove('show');
+}
+
+async function saveEdit() {
+  const id = document.getElementById('editId').value;
+  const timeVal = document.getElementById('editTime').value;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const pickupTime = new Date(`${today}T${timeVal}:00`);
+  const ctOffset = getCTOffset();
+  const pickupUTC = new Date(pickupTime.getTime() - ctOffset);
+
+  const newStatus = document.getElementById('editStatus').value;
+  const oldReq = allRequests.find(r => r.id === id);
+  const updates = {
+    passenger_name: document.getElementById('editName').value.trim(),
+    passenger_phone: document.getElementById('editPhone').value.trim(),
+    pickup_location: document.getElementById('editPickup').value.trim(),
+    dropoff_location: document.getElementById('editDropoff').value.trim(),
+    pickup_time: pickupUTC.toISOString(),
+    status: newStatus,
+    notes: document.getElementById('editNotes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+
+  // Set timestamp fields based on status changes
+  if (newStatus === 'claimed' && oldReq && oldReq.status !== 'claimed') updates.claimed_at = new Date().toISOString();
+  if (newStatus === 'picked_up' && oldReq && oldReq.status !== 'picked_up') updates.picked_up_at = new Date().toISOString();
+  if (newStatus === 'dropped_off' && oldReq && oldReq.status !== 'dropped_off') updates.dropped_off_at = new Date().toISOString();
+  if (newStatus === 'cancelled' && oldReq && oldReq.status !== 'cancelled') updates.cancelled_at = new Date().toISOString();
+
+  const { error } = await sb.from('sxsw_ada_requests').update(updates).eq('id', id);
+  if (error) { alert('Error saving changes.'); console.error(error); return; }
+  closeModal();
+}
+
+/* ── Cancel ── */
+async function cancelRequest(id) {
+  if (!confirm('Cancel this request?')) return;
+  const { error } = await sb.from('sxsw_ada_requests').update({
+    status: 'cancelled',
+    cancelled_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('Error cancelling.'); console.error(error); }
+}
+
+/* ── Helpers ── */
+function getCTOffset() {
+  const jan = new Date(new Date().getFullYear(), 0, 1);
+  const jul = new Date(new Date().getFullYear(), 6, 1);
+  const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+  const isDST = new Date().getTimezoneOffset() < stdOffset;
+  return isDST ? -5 * 60 * 60 * 1000 : -6 * 60 * 60 * 1000;
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+</script>
+</body>
+</html>

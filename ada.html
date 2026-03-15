@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SXSW ADA Shuttle Request</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px; background: rgba(15,15,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px);
+  }
+  .top-bar h1 { font-size: 16px; font-weight: 700; color: #fff; white-space: nowrap; }
+  .top-bar-left { display: flex; align-items: center; gap: 12px; }
+  .ada-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(59,130,246,0.15); color: #60a5fa; }
+
+  /* ── Container ── */
+  .container { max-width: 560px; margin: 0 auto; padding: 24px 20px; }
+
+  /* ── Form ── */
+  .form-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 24px; margin-bottom: 32px;
+  }
+  .form-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .form-desc { font-size: 12px; color: #666; margin-bottom: 20px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: #fff; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus, .field textarea:focus { border-color: rgba(59,130,246,0.5); }
+  .field input::placeholder, .field textarea::placeholder { color: #555; }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field { flex: 1; }
+  .submit-btn {
+    width: 100%; padding: 12px; background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600;
+    border: none; border-radius: 8px; cursor: pointer; transition: background 0.15s;
+  }
+  .submit-btn:hover { background: #2563eb; }
+  .submit-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  /* ── Success toast ── */
+  .toast {
+    position: fixed; top: 80px; left: 50%; transform: translateX(-50%); padding: 12px 24px;
+    background: #166534; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 600;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ── Section ── */
+  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .section-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+  .section-count { font-size: 11px; color: #555; }
+
+  /* ── Request Cards ── */
+  .request-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; transition: border-color 0.15s;
+  }
+  .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .request-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .status-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .status-pending { background: rgba(234,179,8,0.15); color: #facc15; }
+  .status-claimed { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .status-picked_up { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .status-dropped_off { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .request-detail { font-size: 12px; color: #888; margin-bottom: 4px; display: flex; align-items: flex-start; gap: 6px; }
+  .request-detail span.label { color: #555; min-width: 60px; flex-shrink: 0; }
+  .request-shuttle { font-size: 11px; color: #60a5fa; margin-top: 6px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: #444; font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .container { padding: 16px; }
+    .form-card { padding: 18px; }
+    .field-row { flex-direction: column; gap: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-bar-left">
+    <h1>SXSW ADA Shuttle</h1>
+    <span class="ada-badge">ADA</span>
+  </div>
+</div>
+
+<div class="toast" id="toast">Request submitted successfully!</div>
+
+<div class="container">
+  <!-- Request Form -->
+  <div class="form-card">
+    <div class="form-title">Request a Ride</div>
+    <div class="form-desc">Submit an ADA shuttle pickup request. Your request will be sent to our drivers in real time.</div>
+
+    <form id="requestForm" onsubmit="return submitRequest(event)">
+      <div class="field-row">
+        <div class="field">
+          <label>Passenger Name</label>
+          <input type="text" id="passengerName" placeholder="Full name" required>
+        </div>
+        <div class="field">
+          <label>Phone Number</label>
+          <input type="tel" id="passengerPhone" placeholder="(512) 555-0123" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Pickup Location</label>
+        <input type="text" id="pickupLocation" placeholder="Address or venue name" required>
+      </div>
+
+      <div class="field">
+        <label>Drop-off Location</label>
+        <input type="text" id="dropoffLocation" placeholder="Address or venue name" required>
+      </div>
+
+      <div class="field">
+        <label>Pickup Time</label>
+        <input type="time" id="pickupTime" required>
+      </div>
+
+      <div class="field">
+        <label>Notes (optional)</label>
+        <textarea id="notes" placeholder="Any special instructions or details"></textarea>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">Submit Request</button>
+    </form>
+  </div>
+
+  <!-- Active Requests -->
+  <div class="section-header">
+    <div class="section-title">Active Requests</div>
+    <div class="section-count" id="activeCount"></div>
+  </div>
+  <div id="activeRequests"></div>
+
+  <!-- Completed Requests -->
+  <div class="section-header" style="margin-top: 24px;">
+    <div class="section-title">Completed</div>
+    <div class="section-count" id="completedCount"></div>
+  </div>
+  <div id="completedRequests"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let allRequests = [];
+
+/* ── Init ── */
+(async function init() {
+  // Default time to now (Central Time)
+  const now = new Date();
+  const ct = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  const hh = String(ct.getHours()).padStart(2, '0');
+  const mm = String(ct.getMinutes()).padStart(2, '0');
+  document.getElementById('pickupTime').value = `${hh}:${mm}`;
+
+  await loadRequests();
+  subscribeRealtime();
+})();
+
+/* ── Load requests ── */
+async function loadRequests() {
+  const { data, error } = await sb
+    .from('sxsw_ada_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Load error:', error); return; }
+  allRequests = data || [];
+  render();
+}
+
+/* ── Realtime ── */
+function subscribeRealtime() {
+  sb.channel('ada-requests-public')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sxsw_ada_requests' }, payload => {
+      if (payload.eventType === 'INSERT') {
+        allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = allRequests.findIndex(r => r.id === payload.new.id);
+        if (idx >= 0) allRequests[idx] = payload.new; else allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        allRequests = allRequests.filter(r => r.id !== payload.old.id);
+      }
+      render();
+    })
+    .subscribe();
+}
+
+/* ── Submit ── */
+async function submitRequest(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+
+  const timeVal = document.getElementById('pickupTime').value;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const pickupTime = new Date(`${today}T${timeVal}:00`);
+  // Convert to CT interpretation
+  const ctOffset = getCTOffset();
+  const pickupUTC = new Date(pickupTime.getTime() - ctOffset);
+
+  const record = {
+    passenger_name: document.getElementById('passengerName').value.trim(),
+    passenger_phone: document.getElementById('passengerPhone').value.trim(),
+    pickup_location: document.getElementById('pickupLocation').value.trim(),
+    dropoff_location: document.getElementById('dropoffLocation').value.trim(),
+    pickup_time: pickupUTC.toISOString(),
+    notes: document.getElementById('notes').value.trim() || null,
+    status: 'pending'
+  };
+
+  const { error } = await sb.from('sxsw_ada_requests').insert([record]);
+  btn.disabled = false; btn.textContent = 'Submit Request';
+
+  if (error) { alert('Error submitting request. Please try again.'); console.error(error); return; }
+
+  document.getElementById('requestForm').reset();
+  // Reset time to now
+  const now = new Date();
+  const ct = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  document.getElementById('pickupTime').value = `${String(ct.getHours()).padStart(2,'0')}:${String(ct.getMinutes()).padStart(2,'0')}`;
+
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function getCTOffset() {
+  const jan = new Date(new Date().getFullYear(), 0, 1);
+  const jul = new Date(new Date().getFullYear(), 6, 1);
+  const stdOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+  const isDST = new Date().getTimezoneOffset() < stdOffset;
+  // CT is UTC-6 (CST) or UTC-5 (CDT)
+  return isDST ? -5 * 60 * 60 * 1000 : -6 * 60 * 60 * 1000;
+}
+
+/* ── Render ── */
+function render() {
+  const active = allRequests.filter(r => ['pending','claimed','picked_up'].includes(r.status));
+  const completed = allRequests.filter(r => ['dropped_off','cancelled'].includes(r.status));
+
+  document.getElementById('activeCount').textContent = active.length ? `${active.length} request${active.length !== 1 ? 's' : ''}` : '';
+  document.getElementById('completedCount').textContent = completed.length ? `${completed.length}` : '';
+
+  document.getElementById('activeRequests').innerHTML = active.length
+    ? active.map(r => renderCard(r)).join('')
+    : '<div class="empty-state">No active requests</div>';
+
+  document.getElementById('completedRequests').innerHTML = completed.length
+    ? completed.map(r => renderCard(r)).join('')
+    : '<div class="empty-state">No completed requests yet</div>';
+}
+
+function renderCard(r) {
+  const statusLabels = { pending: 'Pending', claimed: 'Claimed', picked_up: 'Picked Up', dropped_off: 'Dropped Off', cancelled: 'Cancelled' };
+  const time = formatTime(r.pickup_time);
+  return `
+    <div class="request-card">
+      <div class="request-card-header">
+        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
+      </div>
+      <div class="request-detail"><span class="label">Pickup</span> ${esc(r.pickup_location)}</div>
+      <div class="request-detail"><span class="label">Drop-off</span> ${esc(r.dropoff_location)}</div>
+      <div class="request-detail"><span class="label">Time</span> ${time}</div>
+      ${r.notes ? `<div class="request-detail"><span class="label">Notes</span> ${esc(r.notes)}</div>` : ''}
+      ${r.shuttle_num ? `<div class="request-shuttle">Shuttle ${r.shuttle_num}</div>` : ''}
+    </div>`;
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+</script>
+</body>
+</html>

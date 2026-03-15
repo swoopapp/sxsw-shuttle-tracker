@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SXSW ADA Driver</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a; color: #e0e0e0; min-height: 100vh;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 20px; background: rgba(15,15,15,0.95); border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px);
+  }
+  .top-bar h1 { font-size: 16px; font-weight: 700; color: #fff; }
+  .top-bar-left { display: flex; align-items: center; gap: 10px; }
+  .shuttle-tag {
+    font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 5px;
+    background: rgba(59,130,246,0.15); color: #60a5fa;
+  }
+  .change-btn {
+    font-size: 11px; color: #666; background: none; border: 1px solid rgba(255,255,255,0.08);
+    padding: 4px 10px; border-radius: 5px; cursor: pointer;
+  }
+  .change-btn:hover { color: #fff; border-color: rgba(255,255,255,0.2); }
+
+  /* ── Shuttle Picker ── */
+  .picker-overlay {
+    position: fixed; inset: 0; background: #0a0a0a; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  }
+  .picker-overlay.hidden { display: none; }
+  .picker-title { font-size: 20px; font-weight: 700; color: #fff; }
+  .picker-desc { font-size: 13px; color: #666; }
+  .picker-grid { display: flex; gap: 16px; }
+  .picker-btn {
+    width: 100px; height: 100px; border-radius: 16px; border: 2px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.08); color: #60a5fa; font-size: 32px; font-weight: 800;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; transition: all 0.15s;
+  }
+  .picker-btn span { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  .picker-btn:hover { background: rgba(59,130,246,0.2); border-color: #3b82f6; }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex; border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0 20px; background: rgba(15,15,15,0.6);
+  }
+  .tab {
+    padding: 10px 16px; font-size: 12px; font-weight: 600; color: #555; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .tab:hover { color: #888; }
+  .tab.active { color: #fff; border-bottom-color: #3b82f6; }
+  .tab .badge {
+    display: inline-block; min-width: 16px; padding: 1px 5px; border-radius: 8px; font-size: 10px;
+    font-weight: 700; text-align: center; margin-left: 6px;
+  }
+  .tab .badge.pending-badge { background: rgba(234,179,8,0.2); color: #facc15; }
+  .tab .badge.my-badge { background: rgba(59,130,246,0.2); color: #60a5fa; }
+
+  /* ── Content ── */
+  .content { padding: 16px 20px; }
+
+  /* ── Request Cards ── */
+  .request-card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 12px;
+  }
+  .request-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .request-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .request-phone-link { font-size: 13px; color: #60a5fa; text-decoration: none; margin-left: 8px; }
+  .status-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .status-pending { background: rgba(234,179,8,0.15); color: #facc15; }
+  .status-claimed { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .status-picked_up { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .status-dropped_off { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
+  .request-detail {
+    font-size: 14px; color: #ccc; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px;
+  }
+  .request-detail span.label { color: #666; min-width: 65px; flex-shrink: 0; font-size: 12px; }
+  .request-detail span.value { font-weight: 500; }
+  .request-notes { font-size: 12px; color: #888; margin-top: 6px; font-style: italic; }
+  .request-time-label { font-size: 11px; color: #555; margin-top: 8px; }
+
+  /* ── Action Buttons (driver) ── */
+  .trip-actions { margin-top: 14px; }
+  .trip-btn {
+    width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 15px;
+    font-weight: 700; cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .trip-btn.claim { background: #3b82f6; color: #fff; }
+  .trip-btn.claim:hover { background: #2563eb; }
+  .trip-btn.pickup { background: #8b5cf6; color: #fff; }
+  .trip-btn.pickup:hover { background: #7c3aed; }
+  .trip-btn.dropoff { background: #22c55e; color: #fff; }
+  .trip-btn.dropoff:hover { background: #16a34a; }
+  .trip-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+  /* ── Active Trip Banner ── */
+  .active-trip-banner {
+    background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  .active-trip-banner-title { font-size: 11px; font-weight: 700; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
+
+  /* ── Connection dot ── */
+  .conn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .conn-dot.on { background: #22c55e; }
+  .conn-dot.off { background: #ef4444; }
+
+  /* ── Completed history ── */
+  .completed-card {
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+
+<!-- Shuttle Picker Overlay -->
+<div class="picker-overlay" id="pickerOverlay">
+  <div class="picker-title">Select Your Shuttle</div>
+  <div class="picker-desc">ADA Accessible Vehicles</div>
+  <div class="picker-grid">
+    <button class="picker-btn" onclick="selectShuttle(1)">1<span>ADA</span></button>
+    <button class="picker-btn" onclick="selectShuttle(2)">2<span>ADA</span></button>
+  </div>
+</div>
+
+<!-- Main App (hidden until shuttle selected) -->
+<div id="mainApp" style="display:none;">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <h1>ADA Driver</h1>
+      <span class="shuttle-tag" id="shuttleTag">Shuttle —</span>
+      <span><span class="conn-dot" id="connDot"></span></span>
+    </div>
+    <button class="change-btn" onclick="changeShuttle()">Change</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabAvailable" onclick="setTab('available')">Available <span class="badge pending-badge" id="availBadge">0</span></div>
+    <div class="tab" id="tabMyTrip" onclick="setTab('mytrip')">My Trip <span class="badge my-badge" id="myBadge" style="display:none"></span></div>
+    <div class="tab" id="tabHistory" onclick="setTab('history')">History</div>
+  </div>
+
+  <div class="content" id="contentArea"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mylhldsyxkmzkksgifgt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bGhsZHN5eGttemtrc2dpZmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NTI4OTIsImV4cCI6MjA3MDIyODg5Mn0.524xtBviD7Y8oQxDSVu9TFWyWz0T4jj0IkMd4N6ANag';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let shuttleNum = null;
+let allRequests = [];
+let currentTab = 'available';
+
+/* ── Init ── */
+(function init() {
+  const saved = localStorage.getItem('ada_shuttle_num');
+  if (saved) {
+    shuttleNum = parseInt(saved);
+    showApp();
+  }
+})();
+
+/* ── Shuttle Selection ── */
+function selectShuttle(num) {
+  shuttleNum = num;
+  localStorage.setItem('ada_shuttle_num', num);
+  showApp();
+}
+
+function changeShuttle() {
+  localStorage.removeItem('ada_shuttle_num');
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('pickerOverlay').classList.remove('hidden');
+}
+
+async function showApp() {
+  document.getElementById('pickerOverlay').classList.add('hidden');
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('shuttleTag').textContent = `Shuttle ${shuttleNum}`;
+  await loadRequests();
+  subscribeRealtime();
+}
+
+/* ── Load ── */
+async function loadRequests() {
+  const { data, error } = await sb
+    .from('sxsw_ada_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Load error:', error); return; }
+  allRequests = data || [];
+  render();
+}
+
+/* ── Realtime ── */
+function subscribeRealtime() {
+  sb.channel('ada-requests-driver')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sxsw_ada_requests' }, payload => {
+      if (payload.eventType === 'INSERT') {
+        allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = allRequests.findIndex(r => r.id === payload.new.id);
+        if (idx >= 0) allRequests[idx] = payload.new; else allRequests.unshift(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        allRequests = allRequests.filter(r => r.id !== payload.old.id);
+      }
+      render();
+    })
+    .subscribe((status) => {
+      const dot = document.getElementById('connDot');
+      dot.className = status === 'SUBSCRIBED' ? 'conn-dot on' : 'conn-dot off';
+    });
+}
+
+/* ── Tabs ── */
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tab === 'available' ? 'tabAvailable' : tab === 'mytrip' ? 'tabMyTrip' : 'tabHistory').classList.add('active');
+  render();
+}
+
+/* ── Actions ── */
+async function claimTrip(id) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'CLAIMING...';
+  const { error } = await sb.from('sxsw_ada_requests').update({
+    status: 'claimed',
+    shuttle_num: shuttleNum,
+    claimed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('Error claiming trip.'); console.error(error); btn.disabled = false; btn.textContent = 'CLAIM TRIP'; return; }
+  currentTab = 'mytrip';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tabMyTrip').classList.add('active');
+}
+
+async function markPickedUp(id) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'UPDATING...';
+  const { error } = await sb.from('sxsw_ada_requests').update({
+    status: 'picked_up',
+    picked_up_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'PICKED UP'; }
+}
+
+async function markDroppedOff(id) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'UPDATING...';
+  const { error } = await sb.from('sxsw_ada_requests').update({
+    status: 'dropped_off',
+    dropped_off_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('Error updating.'); console.error(error); btn.disabled = false; btn.textContent = 'DROPPED OFF'; }
+}
+
+/* ── Render ── */
+function render() {
+  const available = allRequests.filter(r => r.status === 'pending');
+  const myTrips = allRequests.filter(r => r.shuttle_num === shuttleNum && ['claimed','picked_up'].includes(r.status));
+  const history = allRequests.filter(r => r.shuttle_num === shuttleNum && ['dropped_off','cancelled'].includes(r.status));
+
+  // Badges
+  document.getElementById('availBadge').textContent = available.length;
+  if (myTrips.length) {
+    document.getElementById('myBadge').style.display = 'inline-block';
+    document.getElementById('myBadge').textContent = myTrips.length;
+  } else {
+    document.getElementById('myBadge').style.display = 'none';
+  }
+
+  const area = document.getElementById('contentArea');
+
+  if (currentTab === 'available') {
+    // Show active trip banner if exists
+    let banner = '';
+    if (myTrips.length) {
+      const t = myTrips[0];
+      banner = `
+        <div class="active-trip-banner">
+          <div class="active-trip-banner-title">Active Trip</div>
+          <div style="font-size:13px;color:#ccc;">${esc(t.passenger_name)} — ${esc(t.pickup_location)} → ${esc(t.dropoff_location)}</div>
+        </div>`;
+    }
+    area.innerHTML = banner + (available.length
+      ? available.map(r => renderAvailableCard(r)).join('')
+      : '<div class="empty-state">No pending requests right now</div>');
+  } else if (currentTab === 'mytrip') {
+    area.innerHTML = myTrips.length
+      ? myTrips.map(r => renderMyTripCard(r)).join('')
+      : '<div class="empty-state">No active trip — claim one from Available</div>';
+  } else {
+    area.innerHTML = history.length
+      ? history.map(r => renderHistoryCard(r)).join('')
+      : '<div class="empty-state">No completed trips yet</div>';
+  }
+}
+
+function renderAvailableCard(r) {
+  const time = formatTime(r.pickup_time);
+  return `
+    <div class="request-card">
+      <div class="request-card-header">
+        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span class="status-badge status-pending">Pending</span>
+      </div>
+      <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>
+      <div class="request-detail"><span class="label">Drop-off</span> <span class="value">${esc(r.dropoff_location)}</span></div>
+      <div class="request-detail"><span class="label">Time</span> <span class="value">${time}</span></div>
+      ${r.notes ? `<div class="request-notes">${esc(r.notes)}</div>` : ''}
+      <a href="tel:${esc(r.passenger_phone)}" class="request-phone-link">${esc(r.passenger_phone)}</a>
+      <div class="trip-actions">
+        <button class="trip-btn claim" onclick="claimTrip('${r.id}')">CLAIM TRIP</button>
+      </div>
+    </div>`;
+}
+
+function renderMyTripCard(r) {
+  const time = formatTime(r.pickup_time);
+  const isClaimed = r.status === 'claimed';
+  const isPickedUp = r.status === 'picked_up';
+  return `
+    <div class="request-card">
+      <div class="request-card-header">
+        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span class="status-badge status-${r.status}">${isClaimed ? 'Claimed' : 'Picked Up'}</span>
+      </div>
+      <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>
+      <div class="request-detail"><span class="label">Drop-off</span> <span class="value">${esc(r.dropoff_location)}</span></div>
+      <div class="request-detail"><span class="label">Time</span> <span class="value">${time}</span></div>
+      ${r.notes ? `<div class="request-notes">${esc(r.notes)}</div>` : ''}
+      <a href="tel:${esc(r.passenger_phone)}" class="request-phone-link">${esc(r.passenger_phone)}</a>
+      <div class="trip-actions">
+        ${isClaimed ? `<button class="trip-btn pickup" onclick="markPickedUp('${r.id}')">PICKED UP</button>` : ''}
+        ${isPickedUp ? `<button class="trip-btn dropoff" onclick="markDroppedOff('${r.id}')">DROPPED OFF</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderHistoryCard(r) {
+  const statusLabels = { dropped_off: 'Dropped Off', cancelled: 'Cancelled' };
+  const time = formatTime(r.pickup_time);
+  return `
+    <div class="request-card completed-card">
+      <div class="request-card-header">
+        <span class="request-name">${esc(r.passenger_name)}</span>
+        <span class="status-badge status-${r.status}">${statusLabels[r.status]}</span>
+      </div>
+      <div class="request-detail"><span class="label">Pickup</span> <span class="value">${esc(r.pickup_location)}</span></div>
+      <div class="request-detail"><span class="label">Drop-off</span> <span class="value">${esc(r.dropoff_location)}</span></div>
+      <div class="request-detail"><span class="label">Time</span> <span class="value">${time}</span></div>
+      <div class="request-time-label">${r.dropped_off_at ? 'Completed ' + formatDateTime(r.dropped_off_at) : r.cancelled_at ? 'Cancelled ' + formatDateTime(r.cancelled_at) : ''}</div>
+    </div>`;
+}
+
+/* ── Helpers ── */
+function formatTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+</script>
+</body>
+</html>
