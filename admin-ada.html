@@ -948,6 +948,7 @@ function isStaleEta(r) {
 let map = null;
 let mapMarkers = [];
 let shuttleMarkers = {};
+let shuttleLastSeen = {};
 let mapVisible = false;
 let shuttlePollInterval = null;
 
@@ -1055,11 +1056,15 @@ async function updateShuttleMarkers() {
       const lat = coords.latitude;
       const lng = coords.longitude;
 
+      shuttleLastSeen[num] = new Date();
+      const popupContent = () => `<div class="popup-trip">Shuttle ${num}</div><div class="popup-time">Updated ${relativeTime(shuttleLastSeen[num].toISOString())}</div>`;
+
       if (shuttleMarkers[num]) {
         shuttleMarkers[num].setLatLng([lat, lng]);
+        shuttleMarkers[num].setPopupContent(popupContent());
       } else {
         shuttleMarkers[num] = L.marker([lat, lng], { icon: createShuttleIcon(num), zIndexOffset: 1000 })
-          .bindPopup(`<div class="popup-trip">Shuttle ${num}</div><div class="popup-time">Live GPS position</div>`)
+          .bindPopup(popupContent())
           .addTo(map);
       }
     } catch (e) { console.error('Shuttle GPS error for shuttle', num, e); }
